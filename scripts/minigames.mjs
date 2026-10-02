@@ -503,7 +503,7 @@ export class DualRotationGame extends MiniGame {
 }
 
 /* ------------------------------------------------------------------ */
-/*  3. Pin Tumbler — push a pin, catch it while it pauses at its notch */
+/*  3. Pin Tumbler — pins bind in a hidden random order; find the binder */
 /* ------------------------------------------------------------------ */
 
 export class PinTumblerGame extends MiniGame {
@@ -518,10 +518,13 @@ export class PinTumblerGame extends MiniGame {
     this.riseSpeed = lerp(1.1, 3.2, this.t);
     this.fallSpeed = 3.2;
     this.pause = lerp(0.7, 0.13, this.t);
-    const fakes = this.t > 0.45 ? Math.round(lerp(1, 3, (this.t - 0.45) / 0.55)) : 0;
-    this.retestCost = lerp(6, 16, this.t);
+    this.testCost = lerp(3, 8, this.t);
+    this.freePushes = 2;
+    this.hintBinder = this.t < 0.6;
+    this.binderGlow = 0;
     this.dropOnError = this.t >= 0.7 ? "all" : (this.t >= 0.35 ? "last" : "none");
-    this.lastSet = null;
+    this.showBinder = this.t < 0.35;
+    const fakes = this.t > 0.45 ? Math.round(lerp(1, 3, (this.t - 0.45) / 0.55)) : 0;
     this.pins = Array.from({ length: this.n }, () => ({
       notch: rnd(0.35, 0.95),
       fake: null,
@@ -530,18 +533,23 @@ export class PinTumblerGame extends MiniGame {
       pauseT: 0,
       known: false,
       set: false,
+      tested: false,
       flash: 0,
-      pushes: 0,
       rise: 1,
       pauseMul: 1,
       passedFake: false,
       passedNotch: false
     }));
-    this.rerollRhythm();
     for ( const p of this.pins.slice().sort(() => Math.random() - 0.5).slice(0, fakes) ) {
       p.fake = Math.random() < 0.5 ? rnd(0.12, p.notch - 0.15) : rnd(p.notch + 0.12, 0.98);
       if ( p.fake < 0.1 || p.fake > 0.99 ) p.fake = null;
     }
+    // Hidden binding order: only the binding pin pauses at its notch, the others spring straight back.
+    this.order = this.pins.map((_, i) => i).sort(() => Math.random() - 0.5);
+    this.setCount = 0;
+    this.roundPushes = 0;
+    this.lastSet = null;
+    this.rerollRhythm();
     this.frameW = Math.min(this.W - 60, this.n * 56 + 30);
     this.x0 = (this.W - this.frameW) / 2;
     this.colW = this.frameW / this.n;
@@ -552,6 +560,8 @@ export class PinTumblerGame extends MiniGame {
     this.travel = this.bottom - this.base - this.top - this.pinH - 10;
   }
 
+  get binder() { return this.setCount < this.n ? this.pins[this.order[this.setCount]] : null; }
+
   /** Every unset pin gets its own rise speed and pause length; called again after each set pin. */
   rerollRhythm() {
     for ( const p of this.pins ) {
@@ -561,17 +571,25 @@ export class PinTumblerGame extends MiniGame {
     }
   }
 
+  newRound() {
+    this.roundPushes = 0;
+    for ( const p of this.pins ) p.tested = false;
+    this.rerollRhythm();
+  }
+
   update(dt) {
+    if ( this.binderGlow > 0 ) this.binderGlow -= dt;
     for ( const p of this.pins ) {
       if ( p.flash > 0 ) p.flash = Math.max(0, p.flash - dt * 3);
       else if ( p.flash < 0 ) p.flash = Math.min(0, p.flash + dt * 3);
       if ( p.set ) continue;
       switch ( p.state ) {
         case "rise": {
+          const binding = p === this.binder;
           const next = p.pos + this.riseSpeed * p.rise * dt;
-          if ( p.fake !== null && !p.passedFake && p.pos < p.fake && next >= p.fake ) {
+          if ( binding && p.fake !== null && !p.passedFake && p.pos < p.fake && next >= p.fake ) {
             p.pos = p.fake; p.passedFake = true; p.state = "fakepause"; p.pauseT = this.pause * p.pauseMul * 0.45;
-          } else if ( !p.passedNotch && p.pos < p.notch && next >= p.notch ) {
+          } else if ( binding && !p.passedNotch && p.pos < p.notch && next >= p.notch ) {
             p.pos = p.notch; p.passedNotch = true; p.known = true; p.state = "pause"; p.pauseT = this.pause * p.pauseMul;
           } else if ( next >= 1 ) {
             p.pos = 1; p.state = "fall";
@@ -597,9 +615,12 @@ export class PinTumblerGame extends MiniGame {
     const p = this.pins[i];
     if ( p.set ) return;
     if ( p.state === "idle" ) {
-      p.pushes += 1;
-      if ( p.pushes > 1 ) this.damage(this.retestCost);
+      // Test push: the first one each round is free, later ones cost pick health.
+      this.roundPushes += 1;
+      if ( this.roundPushes > this.freePushes ) this.damage(this.testCost);
+      if ( this.hintBinder && p !== this.binder ) this.binderGlow = 0.6;
       if ( !this.running ) return;
+      p.tested = true;
       p.state = "rise";
       p.passedFake = false; p.passedNotch = false;
       return;
@@ -609,8 +630,9 @@ export class PinTumblerGame extends MiniGame {
       p.pos = p.notch;
       p.flash = 1;
       this.lastSet = p;
-      if ( this.pins.every(q => q.set) ) return this.win();
-      this.rerollRhythm();
+      this.setCount += 1;
+      if ( this.setCount >= this.n ) return this.win();
+      this.newRound();
       return;
     }
     this.errors += 1;
@@ -618,16 +640,19 @@ export class PinTumblerGame extends MiniGame {
     p.state = "fall";
     const dropped = this.dropOnError === "all" ? this.pins.filter(q => q.set)
       : (this.dropOnError === "last" && this.lastSet?.set ? [this.lastSet] : []);
-    for ( const q of dropped ) { q.set = false; q.state = "fall"; q.flash = -1; q.pushes = 0; }
-    if ( dropped.length ) this.lastSet = null;
+    for ( const q of dropped ) { q.set = false; q.state = "fall"; q.flash = -1; }
+    if ( dropped.length ) {
+      this.setCount -= dropped.length;
+      this.lastSet = null;
+      this.newRound();
+    }
     this.damage(100 / this.errorsAllowed + 0.01);
   }
 
   draw() {
     const ctx = this.ctx;
     drawBackground(ctx, this.W, this.H, 0);
-    const setCount = this.pins.filter(p => p.set).length;
-    label(ctx, game.i18n.format("LPM.Tumbler.Remaining", { n: this.n - setCount }), this.W / 2, 26, { size: 13, bold: true });
+    label(ctx, game.i18n.format("LPM.Tumbler.Remaining", { n: this.n - this.setCount }), this.W / 2, 26, { size: 13, bold: true });
     label(ctx, game.i18n.format("LPM.Tumbler.Errors", { n: Math.max(0, this.errorsAllowed - this.errors) }), this.W / 2, 46, { size: 11, color: PALETTE.dim });
     ctx.fillStyle = "#1b1a26";
     roundRect(ctx, this.x0 - 12, this.top - 12, this.frameW + 24, this.bottom - this.top + 24, 8);
@@ -636,12 +661,21 @@ export class PinTumblerGame extends MiniGame {
     const baseY = this.bottom - this.base;
     ctx.fillStyle = "#b8912f";
     ctx.fillRect(this.x0 - 12, baseY, this.frameW + 24, this.base + 12);
+    const binder = this.binder;
     for ( let i = 0; i < this.n; i++ ) {
       const p = this.pins[i];
       const cx = this.x0 + this.colW * (i + 0.5);
       const gw = Math.min(26, this.colW * 0.5);
       ctx.fillStyle = "#0d0c16";
       ctx.fillRect(cx - gw / 2, this.top, gw, baseY - this.top);
+      if ( p === binder && (this.showBinder || this.binderGlow > 0) ) {
+        const a = this.showBinder ? 0.45 : 0.6 * Math.min(1, this.binderGlow / 0.3);
+        const g = ctx.createLinearGradient(0, baseY - 40, 0, baseY);
+        g.addColorStop(0, "rgba(216,178,74,0)");
+        g.addColorStop(1, `rgba(216,178,74,${a})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(cx - gw / 2, baseY - 40, gw, 40);
+      }
       const y = baseY - this.pinH - p.pos * this.travel;
       if ( p.known || p.set ) {
         const ny = baseY - this.pinH - p.notch * this.travel;
@@ -668,6 +702,9 @@ export class PinTumblerGame extends MiniGame {
       } else if ( p.state === "pause" || p.state === "fakepause" ) {
         g.addColorStop(0, "#ffffff"); g.addColorStop(0.5, "#c9c9d6");
         g.addColorStop(0.5, "#9fd4ff"); g.addColorStop(1, "#4a8fd6");
+      } else if ( p.tested && !p.set ) {
+        g.addColorStop(0, "#9d9da8"); g.addColorStop(0.5, "#6a6a76");
+        g.addColorStop(0.5, "#4a6f93"); g.addColorStop(1, "#2a4868");
       } else {
         g.addColorStop(0, "#e9e9f0"); g.addColorStop(0.5, "#9a9aa6");
         g.addColorStop(0.5, "#6fb6ff"); g.addColorStop(1, "#2e6fb5");
@@ -685,15 +722,14 @@ export class PinTumblerGame extends MiniGame {
       ctx.moveTo(cx - 5, baseY + 8); ctx.lineTo(cx + 5, baseY + 8); ctx.lineTo(cx, baseY + 16);
       ctx.closePath(); ctx.fill();
       if ( p.state === "idle" && !p.set ) {
-        ctx.fillStyle = "rgba(216,178,74,0.5)";
+        ctx.fillStyle = p.tested ? "rgba(120,120,130,0.4)" : "rgba(216,178,74,0.5)";
         ctx.beginPath(); ctx.moveTo(cx - 4, baseY + 20); ctx.lineTo(cx + 4, baseY + 20); ctx.lineTo(cx, baseY + 14); ctx.closePath(); ctx.fill();
       }
     }
   }
 
   right() {
-    const setCount = this.pins.filter(p => p.set).length;
-    return { value: setCount / this.n, text: `${setCount}/${this.n}` };
+    return { value: this.setCount / this.n, text: `${this.setCount}/${this.n}` };
   }
 }
 

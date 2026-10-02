@@ -3,6 +3,11 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.4.0 — 2026-10-02
+- Pin Tumbler: pins bind in a hidden random order that changes every attempt; only the binding pin pauses at its notch, the others spring straight back and turn dull once tested this round.
+- Two test pushes per round are free, further pushes cost pick health; up to tier 9 a wrong push makes the binding pin's base glow for a moment, on the lowest tiers it glows all the time.
+- Set pins advance the order; errors still drop the last or all set pins at higher tiers. How-to text and README updated.
+
 ## 1.3.0 — 2026-10-02
 - Pin Tumbler: every pin has its own rise speed and pause length, rhythms re-roll after each set pin, the first push of a pin is free and later re-tests cost pick health, and an error drops the last set pin from tier 6 and every set pin from tier 11.
 - Sweet Spot: from tier 7 the mechanism settles after a strained push and the sweet spot shifts a little.
