@@ -3,6 +3,11 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.7.0 — 2026-10-02
+- Spectating is opt-in: other players get a small prompt at the top of the screen (X is picking Y, Watch) and join the live view at its current state only if they press Watch; per-client choice between prompt, open automatically, or never.
+- Locks on items: configure a lock on any item (collar, manacles, strongbox in a pack) from the lock button in its sheet header; owners get a Pick lock header button, anyone in reach of the wearer's token can use the L hotkey. On success the item can be marked unlocked, unequipped, or removed from the inventory.
+- Lock requests now resolve documents by UUID.
+
 ## 1.6.0 — 2026-10-02
 - Spectators: while a player picks a lock, everyone else (or only the GM, or nobody, per the world setting) gets a live read-only window of the same game; per-client opt-out; the window closes itself two seconds after the result.
 - Smoother play: cached background, dial and keyway layers, fewer DOM writes per frame, no shadow blur, and a per-client cap on Foundry's scene frame rate while a lock window is open (default 20 FPS, 0 to disable).

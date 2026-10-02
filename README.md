@@ -24,6 +24,7 @@ Every lock window shows a short "How to" text under the bars. A failed Arcane Lo
 ## What GMs get
 
 - **Door locks**: lock a door as usual (right-click its control). With *Locked doors are pickable* on, every locked door uses the world defaults. Open the wall's config sheet and press **Lock settings…** to give a door its own minigame, tier, key item, attempt limit, cooldown and macros.
+- **Item locks**: open an item's sheet (a collar, manacles, a strongbox in a pack) and press the lock button in its header to configure it, set *Pickable* to Yes and press **Lock**. The wearer, or anyone within reach of the wearer's token, can pick it: owners get a **Pick lock** header button on the item sheet, everyone can use the **L** hotkey. On success the item can simply be marked unlocked, unequipped, or removed from the inventory, and the success macro runs.
 - **Container locks**: select a token, press the lock button in its HUD, set *Pickable* to Yes and press **Lock**. Locked Item Piles containers open their inventory automatically after a successful pick, and *Lock* / *Unlock* also lock or unlock the pile.
 - **Keys**: a character carrying an item named like the lock's key opens it without a minigame (optionally consuming the item).
 - **Tools**: list tool item names with a tier reduction in the settings (`Thieves' Tools=2; Masterwork Picks=4`). The best tool carried lowers the tier; tools can be required, and can break on failure.
@@ -33,7 +34,7 @@ Every lock window shows a short "How to" text under the bars. A failed Arcane Lo
 - **Playground**: *Module Settings → Lockpick Minigames → Open the playground* runs any game at any tier with no lock. GMs can also Ctrl-click a locked door to try its minigame for real.
 - **Chat**: every outcome is whispered to the GM and the player.
 - **Smoothness**: while a lock window is open the client caps Foundry's scene canvas at 20 FPS (per-client setting, 0 to disable) so the minigame gets the frames on heavy scenes.
-- **Spectators**: while a player picks a lock, everyone else (or only the GM, or nobody, per the world setting) gets a live read-only window of the same game, with its own per-client opt-out. The window closes itself two seconds after the result.
+- **Spectators**: while a player picks a lock, everyone else (or only the GM, or nobody, per the world setting) gets a small prompt at the top of the screen: "X is picking Y — Watch". Pressing Watch opens a live read-only window of the same game, joining at the current state; each client can instead choose to open it automatically or never. The window closes itself two seconds after the result.
 
 An active GM client must be connected; players never write to the scene themselves.
 

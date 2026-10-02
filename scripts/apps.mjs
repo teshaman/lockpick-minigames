@@ -399,6 +399,9 @@ export class LockConfigApp extends ApplicationV2 {
       ${group("LPM.Config.ConsumeKey", `<input type="checkbox" name="consumeKey" ${f.consumeKey ? "checked" : ""}>`)}
       ${group("LPM.Config.MaxAttempts", `<input type="number" name="maxAttempts" min="-1" step="1" value="${Number.isFinite(f.maxAttempts) ? f.maxAttempts : -1}">`, "LPM.Config.MaxAttemptsHint")}
       ${group("LPM.Config.Cooldown", `<input type="number" name="cooldown" min="-1" step="1" value="${Number.isFinite(f.cooldown) ? f.cooldown : -1}">`, "LPM.Config.CooldownHint")}
+      ${this.document.documentName === "Item" ? group("LPM.Config.OnUnlock", `<select name="onUnlock">
+          ${opt("none", f.onUnlock ?? "none", L("LPM.Config.OnUnlockNone"))}${opt("unequip", f.onUnlock, L("LPM.Config.OnUnlockUnequip"))}${opt("remove", f.onUnlock, L("LPM.Config.OnUnlockRemove"))}
+        </select>`, "LPM.Config.OnUnlockHint") : ""}
       ${group("LPM.Config.SuccessMacro", `<input type="text" name="successMacro" value="${esc(f.successMacro)}">`)}
       ${group("LPM.Config.FailMacro", `<input type="text" name="failMacro" value="${esc(f.failMacro)}">`, "LPM.Config.MacroHint")}
       <footer class="form-footer">
@@ -425,7 +428,8 @@ export class LockConfigApp extends ApplicationV2 {
       maxAttempts: Number.isFinite(Number(d.maxAttempts)) ? Number(d.maxAttempts) : -1,
       cooldown: Number.isFinite(Number(d.cooldown)) ? Number(d.cooldown) : -1,
       successMacro: String(d.successMacro ?? "").trim(),
-      failMacro: String(d.failMacro ?? "").trim()
+      failMacro: String(d.failMacro ?? "").trim(),
+      onUnlock: ["unequip", "remove"].includes(d.onUnlock) ? d.onUnlock : "none"
     };
     await this.api.setLock(this.document, lock);
     ui.notifications.info(L("LPM.Notify.Saved"));

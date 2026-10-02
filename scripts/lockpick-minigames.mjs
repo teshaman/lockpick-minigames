@@ -71,7 +71,10 @@ function registerSettings() {
     type: String, default: "all",
     choices: { off: "LPM.Setting.spectate.Off", gm: "LPM.Setting.spectate.GM", all: "LPM.Setting.spectate.All" }
   });
-  reg("watchOthers", { type: Boolean, default: true, scope: "client" });
+  reg("watchMode", {
+    type: String, default: "ask", scope: "client",
+    choices: { ask: "LPM.Setting.watchMode.Ask", auto: "LPM.Setting.watchMode.Auto", never: "LPM.Setting.watchMode.Never" }
+  });
   reg("fpsWhilePicking", { type: Number, default: 20, range: { min: 0, max: 60, step: 5 }, scope: "client" });
 }
 
@@ -80,10 +83,19 @@ function registerSettings() {
 /* ------------------------------------------------------------------ */
 
 const isDoor = doc => doc?.documentName === "Wall";
+const isItem = doc => doc?.documentName === "Item";
 
 function docName(doc) {
   if ( isDoor(doc) ) return F("LPM.DoorName", { n: doc.id.slice(0, 4) });
+  if ( isItem(doc) && doc.parent ) return `${doc.name} (${doc.parent.name})`;
   return doc?.name ?? doc?.id ?? "?";
+}
+
+/** The token on the current scene that carries this item's actor, if any. */
+function itemToken(item) {
+  const owner = item?.parent;
+  if ( !owner || !canvas.ready ) return null;
+  return canvas.tokens.placeables.find(t => t.actor === owner || (t.actor?.id === owner.id)) ?? null;
 }
 
 /** Effective configuration of a lock: flag values with world defaults filled in. */
@@ -99,7 +111,8 @@ function getLock(doc) {
     maxAttempts: Number(f.maxAttempts) >= 0 ? Number(f.maxAttempts) : S("maxAttempts"),
     cooldown: Number(f.cooldown) >= 0 ? Number(f.cooldown) : S("cooldown"),
     successMacro: f.successMacro ?? "",
-    failMacro: f.failMacro ?? ""
+    failMacro: f.failMacro ?? "",
+    onUnlock: f.onUnlock ?? "none"
   };
 }
 
@@ -149,6 +162,12 @@ function pointSegDist(px, py, x1, y1, x2, y2) {
 /** Distance in scene units between a token (placeable) and a wall / token document, edge to edge. */
 function distanceTo(token, doc) {
   const gs = canvas.scene.grid.size, gd = canvas.scene.grid.distance;
+  if ( isItem(doc) ) {
+    if ( !doc.parent || doc.parent === token.actor ) return 0;
+    const t = itemToken(doc);
+    if ( !t ) return Infinity;
+    doc = t.document;
+  }
   const c = token.center;
   let px;
   if ( isDoor(doc) ) {
@@ -312,7 +331,8 @@ async function send(data, doc, actor, token) {
     ...data,
     requestId: foundry.utils.randomID(),
     userId: game.user.id,
-    sceneId: doc.parent.id,
+    uuid: doc.uuid,
+    sceneId: doc.parent?.id ?? null,
     docType: doc.documentName,
     docId: doc.id,
     actorId: actor?.id ?? null,
@@ -352,17 +372,24 @@ function onApplied(ack, doc, actor) {
 function onWatch(msg) {
   if ( msg.userId === game.user.id ) return;
   const mode = S("spectate");
-  if ( mode === "off" || (mode === "gm" && !game.user.isGM) || !S("watchOthers") ) return;
+  const mine = S("watchMode");
+  if ( mode === "off" || (mode === "gm" && !game.user.isGM) || mine === "never" ) return;
   const app = watchApps.get(msg.attemptId);
   if ( msg.action === "start" ) {
-    if ( app ) app.close();
-    const w = new LockWatchApp(msg);
-    watchApps.set(msg.attemptId, w);
-    w.render(true);
+    watchBuffer.set(msg.attemptId, { msg, state: foundry.utils.deepClone(msg.state ?? {}), hint: msg.hint ?? "" });
+    if ( mine === "auto" ) openWatch(msg.attemptId);
+    else showWatchToast(msg);
   } else if ( msg.action === "state" ) {
+    const buf = watchBuffer.get(msg.attemptId);
+    if ( buf ) {
+      Object.assign(buf.state, msg.state ?? {});
+      if ( typeof msg.hint === "string" ) buf.hint = msg.hint;
+    }
     app?.applyState(msg);
   } else if ( msg.action === "end" ) {
     watchApps.delete(msg.attemptId);
+    watchBuffer.delete(msg.attemptId);
+    toastFor(msg.attemptId)?.remove();
     app?.finish(msg);
   }
 }
@@ -398,33 +425,37 @@ async function consume(item) {
 
 async function applyRequest(msg) {
   const scene = game.scenes.get(msg.sceneId);
-  const doc = msg.docType === "Wall" ? scene?.walls.get(msg.docId) : scene?.tokens.get(msg.docId);
+  let doc = msg.uuid ? await fromUuid(msg.uuid) : null;
+  if ( !doc ) doc = msg.docType === "Wall" ? scene?.walls.get(msg.docId) : scene?.tokens.get(msg.docId);
   if ( !doc ) return reply(msg, { success: false });
   const lock = getLock(doc);
   const st = getState(doc);
   const user = game.users.get(msg.userId);
-  const actor = (msg.tokenId ? scene.tokens.get(msg.tokenId)?.actor : null) ?? game.actors.get(msg.actorId) ?? null;
-  const token = msg.tokenId ? scene.tokens.get(msg.tokenId) : null;
+  const actor = (msg.tokenId ? scene?.tokens.get(msg.tokenId)?.actor : null) ?? game.actors.get(msg.actorId) ?? null;
+  const token = msg.tokenId ? scene?.tokens.get(msg.tokenId) : null;
   const ctx = { actor, token: token?.object ?? null, tokenDocument: token, lockDocument: doc, user, lock };
 
   if ( msg.type === "key" ) {
     const item = actor?.items.get(msg.itemId);
     if ( !item ) return reply(msg, { success: false });
     if ( lock.consumeKey ) await consume(item);
-    await unlock(doc);
-    await doc.setFlag(MOD, "state", { attempts: {}, cooldownUntil: {}, jammed: false });
+    const name = docName(doc);
+    await unlock(doc, { keepState: false });
     runMacro(lock.successMacro, { ...ctx, success: true, via: "key" });
-    chat("LPM.Chat.Key", { actor: actor?.name ?? user?.name, lock: docName(doc), key: item.name }, msg.userId);
+    chat("LPM.Chat.Key", { actor: actor?.name ?? user?.name, lock: name, key: item.name }, msg.userId);
+    await afterUnlock(doc, lock);
     return reply(msg, { success: true, via: "key" });
   }
 
   if ( msg.success ) {
+    const name = docName(doc);
     await unlock(doc);
     st.attempts[msg.userId] = 0;
     delete st.cooldownUntil[msg.userId];
-    await doc.setFlag(MOD, "state", st);
+    if ( !doc.parent?.items || doc.parent.items.has(doc.id) ) await doc.setFlag(MOD, "state", st);
     runMacro(lock.successMacro, { ...ctx, success: true, via: "pick" });
-    chat("LPM.Chat.Success", { actor: actor?.name ?? user?.name, lock: docName(doc), game: gameLabel(msg.gameId), tier: tierLabel(msg.tier) }, msg.userId);
+    chat("LPM.Chat.Success", { actor: actor?.name ?? user?.name, lock: name, game: gameLabel(msg.gameId), tier: tierLabel(msg.tier) }, msg.userId);
+    await afterUnlock(doc, lock);
     return reply(msg, { success: true, via: "pick" });
   }
 
@@ -453,12 +484,25 @@ async function applyRequest(msg) {
   return reply(msg, { success: false, jammed, broke });
 }
 
-async function unlock(doc, { silent = false } = {}) {
+/** What happens to an unlocked item: nothing, unequip it, or remove it from the inventory. */
+async function afterUnlock(doc, lock) {
+  if ( !isItem(doc) ) return;
+  try {
+    if ( lock.onUnlock === "remove" ) await doc.delete();
+    else if ( lock.onUnlock === "unequip" && foundry.utils.hasProperty(doc, "system.equipped") ) await doc.update({ "system.equipped": false });
+  } catch(err) { console.warn(`${MOD} | item after unlock`, err); }
+}
+
+async function unlock(doc, { silent = false, keepState = true } = {}) {
   if ( isDoor(doc) ) {
     const states = CONST.WALL_DOOR_STATES;
     const ds = S("openOnSuccess") ? states.OPEN : states.CLOSED;
     await doc.update({ ds }, { sound: !silent });
+  } else if ( isItem(doc) ) {
+    await doc.setFlag(MOD, "locked", false);
+    if ( !keepState ) await doc.setFlag(MOD, "state", { attempts: {}, cooldownUntil: {}, jammed: false });
   } else {
+    if ( !keepState ) await doc.setFlag(MOD, "state", { attempts: {}, cooldownUntil: {}, jammed: false });
     await doc.setFlag(MOD, "locked", false);
     try {
       const API = game.itempiles?.API;
@@ -471,6 +515,8 @@ async function lock(doc) {
   if ( isDoor(doc) ) {
     if ( doc.ds === CONST.WALL_DOOR_STATES.OPEN ) await doc.update({ ds: CONST.WALL_DOOR_STATES.CLOSED }, { sound: false });
     await doc.update({ ds: CONST.WALL_DOOR_STATES.LOCKED }, { sound: false });
+  } else if ( isItem(doc) ) {
+    await doc.setFlag(MOD, "locked", true);
   } else {
     await doc.setFlag(MOD, "locked", true);
     try {
@@ -553,7 +599,8 @@ function pickNearest() {
   const maxDist = S("interactionDistance");
   const docs = [
     ...canvas.walls.placeables.map(w => w.document).filter(d => d.door > 0),
-    ...canvas.tokens.placeables.map(t => t.document)
+    ...canvas.tokens.placeables.map(t => t.document),
+    ...canvas.tokens.placeables.flatMap(t => t.actor?.items.contents ?? [])
   ].filter(d => isLocked(d) && isPickable(d));
   let best = null;
   for ( const d of docs ) {
@@ -613,7 +660,64 @@ function onRenderTokenHUD(app, element) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Hooks + API                                                          */
+/*  Item sheets: GM lock settings, player pick button                   */
+/* ------------------------------------------------------------------ */
+
+function itemControls(doc) {
+  const out = [];
+  if ( !isItem(doc) ) return out;
+  if ( game.user.isGM ) out.push({ icon: "fa-solid fa-lock", label: "LPM.Config.Open", action: "lpmConfigure", onClick: () => new LockConfigApp(doc).render(true) });
+  if ( isLocked(doc) && isPickable(doc) ) out.push({ icon: "fa-solid fa-unlock-keyhole", label: "LPM.Item.Pick", action: "lpmPick", onClick: () => attempt(doc, { test: game.user.isGM && !game.keyboard.isModifierActive("CONTROL") }) });
+  return out;
+}
+
+function onHeaderControlsV2(app, controls) {
+  const doc = app.document;
+  if ( !isItem(doc) ) return;
+  for ( const c of itemControls(doc) ) controls.push({ ...c, label: L(c.label), visible: true });
+}
+
+function onItemSheetButtonsV1(app, buttons) {
+  const doc = app.object ?? app.document;
+  if ( !isItem(doc) ) return;
+  for ( const c of itemControls(doc).reverse() ) buttons.unshift({ label: L(c.label), class: c.action, icon: c.icon, onclick: c.onClick });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Spectator prompts                                                    */
+/* ------------------------------------------------------------------ */
+
+const watchBuffer = new Map();
+
+function toastFor(attemptId) {
+  return document.querySelector(`.lpm-toast[data-attempt="${attemptId}"]`);
+}
+
+function showWatchToast(msg) {
+  let host = document.getElementById("lpm-toasts");
+  if ( !host ) {
+    host = document.createElement("div");
+    host.id = "lpm-toasts";
+    document.body.append(host);
+  }
+  const el = document.createElement("div");
+  el.className = "lpm-toast";
+  el.dataset.attempt = msg.attemptId;
+  el.innerHTML = `<i class="fa-solid fa-unlock-keyhole"></i><span>${foundry.utils.escapeHTML(F("LPM.Watch.Prompt", { actor: msg.info?.actor ?? "?", lock: msg.info?.name ?? "" }))}</span>
+    <button type="button" class="watch"><i class="fa-solid fa-eye"></i> ${L("LPM.Watch.Open")}</button><button type="button" class="dismiss" aria-label="close"><i class="fa-solid fa-xmark"></i></button>`;
+  el.querySelector(".watch").addEventListener("click", () => { openWatch(msg.attemptId); el.remove(); });
+  el.querySelector(".dismiss").addEventListener("click", () => el.remove());
+  host.append(el);
+}
+
+function openWatch(attemptId) {
+  const buf = watchBuffer.get(attemptId);
+  if ( !buf ) return;
+  if ( watchApps.get(attemptId)?.rendered ) return watchApps.get(attemptId).bringToFront?.();
+  const w = new LockWatchApp({ ...buf.msg, state: foundry.utils.deepClone(buf.state), hint: buf.hint });
+  watchApps.set(attemptId, w);
+  w.render(true);
+}
 /* ------------------------------------------------------------------ */
 
 Hooks.once("init", () => {
@@ -644,4 +748,6 @@ Hooks.once("ready", () => {
 
 Hooks.on("renderWallConfig", onRenderWallConfig);
 Hooks.on("renderTokenHUD", onRenderTokenHUD);
+Hooks.on("getHeaderControlsApplicationV2", onHeaderControlsV2);
+Hooks.on("getItemSheetHeaderButtons", onItemSheetButtonsV1);
 Hooks.on("item-piles-preOpenInterface", onItemPilesOpen);
