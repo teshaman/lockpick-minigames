@@ -36,60 +36,88 @@ const PALETTE = {
 /*  Drawing helpers                                                    */
 /* ------------------------------------------------------------------ */
 
-function drawBackground(ctx, W, H, danger = 0) {
-  ctx.fillStyle = PALETTE.bg;
-  ctx.fillRect(0, 0, W, H);
-  const g = ctx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, Math.max(W, H) * 0.7);
-  g.addColorStop(0, "rgba(70,58,105,0.35)");
-  g.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
+/** Lazily painted offscreen layer, cached on the game instance. */
+function layer(g, key, w, h, paint) {
+  g.layers ??= {};
+  let c = g.layers[key];
+  if ( !c ) {
+    c = document.createElement("canvas");
+    c.width = Math.ceil(w); c.height = Math.ceil(h);
+    paint(c.getContext("2d"));
+    g.layers[key] = c;
+  }
+  return c;
+}
+
+function drawBackground(g, danger = 0) {
+  const { ctx, W, H } = g;
+  ctx.drawImage(layer(g, "bg", W, H, c => {
+    c.fillStyle = PALETTE.bg;
+    c.fillRect(0, 0, W, H);
+    const v = c.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, Math.max(W, H) * 0.7);
+    v.addColorStop(0, "rgba(70,58,105,0.35)");
+    v.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = v;
+    c.fillRect(0, 0, W, H);
+  }), 0, 0);
   if ( danger > 0 ) {
-    const r = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
-    r.addColorStop(0, "rgba(0,0,0,0)");
-    r.addColorStop(1, `rgba(180,20,20,${0.6 * clamp(danger, 0, 1)})`);
-    ctx.fillStyle = r;
-    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = clamp(danger, 0, 1);
+    ctx.drawImage(layer(g, "danger", W, H, c => {
+      const r = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+      r.addColorStop(0, "rgba(0,0,0,0)");
+      r.addColorStop(1, "rgba(180,20,20,0.6)");
+      c.fillStyle = r;
+      c.fillRect(0, 0, W, H);
+    }), 0, 0);
+    ctx.globalAlpha = 1;
   }
 }
 
-/** A brass lock face: dark outer ring with rivets, rotating brass dome with a keyhole. */
-function drawDial(ctx, cx, cy, r, rot = 0, glow = 0) {
+/** A brass lock face: cached outer ring with rivets, cached brass dome with a keyhole, drawn rotated. */
+function drawDial(g, cx, cy, r, rot = 0, glow = 0) {
+  const ctx = g.ctx;
+  const size = Math.ceil(r * 2 + 6), h = size / 2;
+  const ring = layer(g, `ring${Math.round(r)}`, size, size, c => {
+    const outer = c.createRadialGradient(h, h, r * 0.78, h, h, r);
+    outer.addColorStop(0, "#5a4a2c");
+    outer.addColorStop(1, "#211a0f");
+    c.beginPath(); c.arc(h, h, r, 0, TAU);
+    c.fillStyle = outer; c.fill();
+    c.lineWidth = 2; c.strokeStyle = "#120d07"; c.stroke();
+    for ( let i = 0; i < 12; i++ ) {
+      const a = i * TAU / 12;
+      c.beginPath(); c.arc(h + Math.cos(a) * r * 0.9, h + Math.sin(a) * r * 0.9, r * 0.025, 0, TAU);
+      c.fillStyle = "#cfc4a8"; c.fill();
+    }
+  });
+  const dome = layer(g, `dome${Math.round(r)}`, size, size, c => {
+    const d = c.createRadialGradient(h - r * 0.25, h - r * 0.3, r * 0.05, h, h, r * 0.78);
+    d.addColorStop(0, "#f2d87c");
+    d.addColorStop(0.6, "#b8912f");
+    d.addColorStop(1, "#5a4212");
+    c.beginPath(); c.arc(h, h, r * 0.78, 0, TAU);
+    c.fillStyle = d; c.fill();
+    c.lineWidth = 3; c.strokeStyle = "#2b1f0c"; c.stroke();
+    c.fillStyle = "#120d06";
+    c.beginPath(); c.arc(h, h - r * 0.07, r * 0.085, 0, TAU); c.fill();
+    c.beginPath();
+    c.moveTo(h - r * 0.05, h - r * 0.03); c.lineTo(h + r * 0.05, h - r * 0.03);
+    c.lineTo(h + r * 0.075, h + r * 0.2); c.lineTo(h - r * 0.075, h + r * 0.2);
+    c.closePath(); c.fill();
+  });
+  ctx.drawImage(ring, cx - h, cy - h);
   ctx.save();
   ctx.translate(cx, cy);
-  const outer = ctx.createRadialGradient(0, 0, r * 0.78, 0, 0, r);
-  outer.addColorStop(0, "#5a4a2c");
-  outer.addColorStop(1, "#211a0f");
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU);
-  ctx.fillStyle = outer; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = "#120d07"; ctx.stroke();
-  for ( let i = 0; i < 12; i++ ) {
-    const a = i * TAU / 12;
-    ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9, r * 0.025, 0, TAU);
-    ctx.fillStyle = "#cfc4a8"; ctx.fill();
-  }
   ctx.rotate(rot);
-  const dome = ctx.createRadialGradient(-r * 0.25, -r * 0.3, r * 0.05, 0, 0, r * 0.78);
-  dome.addColorStop(0, "#f2d87c");
-  dome.addColorStop(0.6, "#b8912f");
-  dome.addColorStop(1, "#5a4212");
-  ctx.beginPath(); ctx.arc(0, 0, r * 0.78, 0, TAU);
-  ctx.fillStyle = dome; ctx.fill();
-  ctx.lineWidth = 3; ctx.strokeStyle = "#2b1f0c"; ctx.stroke();
-  if ( glow > 0 ) {
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.78);
-    g.addColorStop(0, `rgba(255,232,150,${0.6 * glow})`);
-    g.addColorStop(1, "rgba(255,232,150,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.78, 0, TAU); ctx.fill();
-  }
-  ctx.fillStyle = "#120d06";
-  ctx.beginPath(); ctx.arc(0, -r * 0.07, r * 0.085, 0, TAU); ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.05, -r * 0.03); ctx.lineTo(r * 0.05, -r * 0.03);
-  ctx.lineTo(r * 0.075, r * 0.2); ctx.lineTo(-r * 0.075, r * 0.2);
-  ctx.closePath(); ctx.fill();
+  ctx.drawImage(dome, -h, -h);
   ctx.restore();
+  if ( glow > 0 ) {
+    const gl = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.78);
+    gl.addColorStop(0, `rgba(255,232,150,${0.6 * glow})`);
+    gl.addColorStop(1, "rgba(255,232,150,0)");
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.78, 0, TAU); ctx.fill();
+  }
 }
 
 function label(ctx, text, x, y, { size = 13, color = PALETTE.text, align = "center", bold = false, caps = true } = {}) {
@@ -133,6 +161,33 @@ export class MiniGame {
     this.mouse = { x: -1, y: -1, down: false, right: false };
     this.space = false;
     this.last = 0;
+    this.frame = 0;
+    this.hintText = "";
+  }
+
+  /** Instance fields that never travel to spectators. */
+  static NOSNAP = new Set(["canvas", "ctx", "host", "raf", "last", "_h", "running", "loop", "layers", "frame", "_sent"]);
+
+  /** JSON-able state for spectators: everything on the first call, only changed fields afterwards. */
+  snapshot(full = false) {
+    this._sent ??= {};
+    if ( full ) this._sent = {};
+    const out = {};
+    for ( const [k, v] of Object.entries(this) ) {
+      if ( MiniGame.NOSNAP.has(k) || typeof v === "function" ) continue;
+      const j = JSON.stringify(v);
+      if ( j === undefined || this._sent[k] === j ) continue;
+      this._sent[k] = j;
+      out[k] = JSON.parse(j);
+    }
+    return out;
+  }
+
+  applySnapshot(data) {
+    for ( const [k, v] of Object.entries(data) ) {
+      if ( MiniGame.NOSNAP.has(k) ) continue;
+      this[k] = v;
+    }
   }
 
   get W() { return this.canvas.width; }
@@ -164,7 +219,7 @@ export class MiniGame {
     this.update(dt);
     if ( !this.running ) return;
     this.draw();
-    this.pushBars();
+    if ( (this.frame++ & 3) === 0 ) this.pushBars();
     this.raf = requestAnimationFrame(this.loop);
   };
 
@@ -192,7 +247,8 @@ export class MiniGame {
   }
 
   hint(key, data = {}) {
-    this.host.hint?.(key ? game.i18n.format(key, data) : "");
+    this.hintText = key ? game.i18n.format(key, data) : "";
+    this.host.hint?.(this.hintText);
   }
 
   damage(amount) {
@@ -338,10 +394,10 @@ export class SweetSpotGame extends MiniGame {
 
   draw() {
     const ctx = this.ctx;
-    drawBackground(ctx, this.W, this.H, this.stress * 0.8);
+    drawBackground(this, this.stress * 0.8);
     const d = angDist(this.pickAngle, this.sweet);
     // Only the two lowest tiers reveal the spot with a glow; above that the partial turn is the only feedback.
-    drawDial(ctx, this.cx, this.cy, this.r, this.rot, this.tier <= 2 && d <= this.tol ? 0.7 : 0);
+    drawDial(this, this.cx, this.cy, this.r, this.rot, this.tier <= 2 && d <= this.tol ? 0.7 : 0);
     const a = this.pickAngle + this.rot;
     const shake = this.stress > 0 ? (Math.random() - 0.5) * this.stress * 10 : 0;
     const len = this.r * 1.25;
@@ -450,8 +506,8 @@ export class DualRotationGame extends MiniGame {
 
   draw() {
     const ctx = this.ctx;
-    drawBackground(ctx, this.W, this.H, this.phase === "track" && this.held && !this.aligned ? 0.7 : 0);
-    drawDial(ctx, this.cx, this.cy, this.r, this.rot, 0);
+    drawBackground(this, this.phase === "track" && this.held && !this.aligned ? 0.7 : 0);
+    drawDial(this, this.cx, this.cy, this.r, this.rot, 0);
     if ( this.phase === "search" ) {
       if ( this.mouse.x >= 0 && this.heat > 0 ) {
         const rad = 30 + 90 * this.heat;
@@ -616,9 +672,9 @@ export class PinTumblerGame extends MiniGame {
     const p = this.pins[i];
     if ( p.set ) return;
     if ( p.state === "idle" ) {
-      // Test push: the first one each round is free, later ones cost pick health.
+      // Test push: a pin's first push each round is free; pushing a pin that already sprang back costs pick health.
       this.roundPushes += 1;
-      if ( this.roundPushes > this.freePushes ) this.damage(this.testCost);
+      if ( p.tested ) this.damage(this.testCost);
       if ( this.hintBinder && p !== this.binder ) this.binderGlow = 0.6;
       if ( !this.running ) return;
       p.tested = true;
@@ -652,7 +708,7 @@ export class PinTumblerGame extends MiniGame {
 
   draw() {
     const ctx = this.ctx;
-    drawBackground(ctx, this.W, this.H, 0);
+    drawBackground(this, 0);
     label(ctx, game.i18n.format("LPM.Tumbler.Remaining", { n: this.n - this.setCount }), this.W / 2, 26, { size: 13, bold: true });
     label(ctx, game.i18n.format("LPM.Tumbler.Errors", { n: Math.max(0, this.errorsAllowed - this.errors) }), this.W / 2, 46, { size: 11, color: PALETTE.dim });
     ctx.fillStyle = "#1b1a26";
@@ -812,7 +868,7 @@ export class SkillCheckGame extends MiniGame {
 
   draw() {
     const ctx = this.ctx;
-    drawBackground(ctx, this.W, this.H, this.flash < 0 ? -this.flash : 0);
+    drawBackground(this, this.flash < 0 ? -this.flash : 0);
     label(ctx, `${this.hits}/${this.need}`, this.cx, 28, { size: 18, bold: true, color: PALETTE.gold });
     ctx.lineWidth = this.width;
     ctx.strokeStyle = "#2a2838";
@@ -837,7 +893,7 @@ export class SkillCheckGame extends MiniGame {
     ctx.strokeStyle = this.flash > 0 ? "#bdf3bd" : "#6fb6ff";
     ctx.beginPath(); ctx.arc(this.cx, this.cy, this.R, z0, z0 + this.capW); ctx.stroke();
     ctx.beginPath(); ctx.arc(this.cx, this.cy, this.R, z1 - this.capW, z1); ctx.stroke();
-    drawDial(ctx, this.cx, this.cy, this.R * 0.42, 0, 0);
+    drawDial(this, this.cx, this.cy, this.R * 0.42, 0, 0);
     const nx = this.cx + Math.cos(this.a) * (this.R + this.width / 2 + 8);
     const ny = this.cy + Math.sin(this.a) * (this.R + this.width / 2 + 8);
     ctx.lineCap = "round";
@@ -962,7 +1018,7 @@ export class TensionGame extends MiniGame {
 
   draw() {
     const ctx = this.ctx;
-    drawBackground(ctx, this.W, this.H, this.tension >= 0.95 ? 0.8 : (this.flash < 0 ? -this.flash : 0));
+    drawBackground(this, this.tension >= 0.95 ? 0.8 : (this.flash < 0 ? -this.flash : 0));
     const gh = this.gBot - this.gTop;
     ctx.fillStyle = "#15141f";
     roundRect(ctx, this.gx, this.gTop, this.gw, gh, 6); ctx.fill();
@@ -1340,22 +1396,26 @@ export class WardTraceGame extends MiniGame {
 
   draw() {
     const ctx = this.ctx;
-    drawBackground(ctx, this.W, this.H, this.flash);
+    drawBackground(this, this.flash);
     ctx.save();
     if ( this.fog > 0 && this.mouse.x >= 0 ) {
       ctx.beginPath();
       ctx.arc(this.mouse.x, this.mouse.y, this.fog, 0, TAU);
       ctx.clip();
     }
+    const hw = Math.round(this.halfW * 2) / 2;
+    ctx.drawImage(layer(this, `corridor${this.kind}${hw}${this.pts.length}`, this.W, this.H, c => {
+      c.lineJoin = "round"; c.lineCap = "round";
+      const path = () => {
+        c.beginPath();
+        c.moveTo(this.pts[0].x, this.pts[0].y);
+        for ( let i = 1; i < this.pts.length; i++ ) c.lineTo(this.pts[i].x, this.pts[i].y);
+        for ( const [a, b] of this.extra ) { c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); }
+      };
+      path(); c.lineWidth = hw * 2 + 4; c.strokeStyle = "#746f86"; c.stroke();
+      path(); c.lineWidth = hw * 2; c.strokeStyle = "#17151f"; c.stroke();
+    }), 0, 0);
     ctx.lineJoin = "round"; ctx.lineCap = "round";
-    const path = () => {
-      ctx.beginPath();
-      ctx.moveTo(this.pts[0].x, this.pts[0].y);
-      for ( let i = 1; i < this.pts.length; i++ ) ctx.lineTo(this.pts[i].x, this.pts[i].y);
-      for ( const [a, b] of this.extra ) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
-    };
-    path(); ctx.lineWidth = this.halfW * 2 + 4; ctx.strokeStyle = "#746f86"; ctx.stroke();
-    path(); ctx.lineWidth = this.halfW * 2; ctx.strokeStyle = "#17151f"; ctx.stroke();
     if ( this.progress > 0 ) {
       let remaining = this.progress * this.total;
       ctx.beginPath();
@@ -1572,7 +1632,7 @@ export class ArcaneLockGame extends MiniGame {
 
   draw() {
     const ctx = this.ctx;
-    drawBackground(ctx, this.W, this.H, 0);
+    drawBackground(this, 0);
     const tint = ctx.createRadialGradient(this.cx, this.cy, 10, this.cx, this.cy, this.r * 1.3);
     tint.addColorStop(0, "rgba(110,70,200,0.28)");
     tint.addColorStop(1, "rgba(60,30,120,0)");
@@ -1590,10 +1650,11 @@ export class ArcaneLockGame extends MiniGame {
     ctx.lineWidth = 7;
     ctx.strokeStyle = "#231c3a";
     ctx.beginPath(); ctx.arc(this.cx, this.cy, this.r + 9, 0, TAU); ctx.stroke();
-    ctx.strokeStyle = frac < 0.25 ? PALETTE.red : "#9f7bff";
-    ctx.shadowColor = "#9f7bff"; ctx.shadowBlur = frac < 0.25 ? 0 : 8;
+    ctx.strokeStyle = "rgba(159,123,255,0.25)"; ctx.lineWidth = 13;
     ctx.beginPath(); ctx.arc(this.cx, this.cy, this.r + 9, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke();
-    ctx.shadowBlur = 0;
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = frac < 0.25 ? PALETTE.red : "#9f7bff";
+    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.r + 9, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke();
     // orbit track
     ctx.lineWidth = 1; ctx.strokeStyle = "rgba(159,123,255,0.25)";
     ctx.beginPath(); ctx.arc(this.cx, this.cy, this.orbitR, 0, TAU); ctx.stroke();

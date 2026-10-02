@@ -6,7 +6,7 @@
  * only client allowed to change the door / token.
  */
 import { GAMES, TIERS, tierLabel, gameLabel, randomGameId } from "./minigames.mjs";
-import { MOD, LockGameApp, LockConfigApp, DemoApp } from "./apps.mjs";
+import { MOD, LockGameApp, LockConfigApp, DemoApp, LockWatchApp } from "./apps.mjs";
 
 const SOCKET = `module.${MOD}`;
 const L = key => game.i18n.localize(key);
@@ -19,6 +19,8 @@ const norm = s => String(s ?? "").toLowerCase().replace(/[‘’ʼ]/g, "'").trim
 const openApps = new Map();
 /** Player-side promises waiting for the GM's acknowledgement, keyed by request id. */
 const pending = new Map();
+/** Spectator windows, keyed by attempt id. */
+const watchApps = new Map();
 
 /* ------------------------------------------------------------------ */
 /*  Settings                                                            */
@@ -65,6 +67,12 @@ function registerSettings() {
   reg("toolBreakChance", { type: Number, default: 0, range: { min: 0, max: 100, step: 5 } });
   reg("openOnSuccess", { type: Boolean, default: false });
   reg("chat", { type: Boolean, default: true });
+  reg("spectate", {
+    type: String, default: "all",
+    choices: { off: "LPM.Setting.spectate.Off", gm: "LPM.Setting.spectate.GM", all: "LPM.Setting.spectate.All" }
+  });
+  reg("watchOthers", { type: Boolean, default: true, scope: "client" });
+  reg("fpsWhilePicking", { type: Number, default: 20, range: { min: 0, max: 60, step: 5 }, scope: "client" });
 }
 
 /* ------------------------------------------------------------------ */
@@ -279,8 +287,12 @@ async function attempt(doc, { test = false } = {}) {
   const tier = clamp(lock.tier - skill - toolRed, 1, TIERS);
 
   if ( openApps.has(doc.uuid) ) return openApps.get(doc.uuid).bringToFront?.();
+  const watch = !test && S("spectate") !== "off" ? {
+    actorName: actor?.name ?? game.user.name,
+    emit: data => game.socket.emit(SOCKET, { type: "watch", userId: game.user.id, ...data })
+  } : null;
   const app = new LockGameApp({
-    gameId, tier,
+    gameId, tier, watch,
     info: { name: docName(doc), baseTier: lock.tier, skill, tool: toolRed ? tool : (tool ? { name: tool.name, reduction: 0 } : null) },
     onResult: (success, { cancelled, started } = {}) => {
       openApps.delete(doc.uuid);
@@ -337,8 +349,27 @@ function onApplied(ack, doc, actor) {
 /*  Applying results (active GM only)                                   */
 /* ------------------------------------------------------------------ */
 
+function onWatch(msg) {
+  if ( msg.userId === game.user.id ) return;
+  const mode = S("spectate");
+  if ( mode === "off" || (mode === "gm" && !game.user.isGM) || !S("watchOthers") ) return;
+  const app = watchApps.get(msg.attemptId);
+  if ( msg.action === "start" ) {
+    if ( app ) app.close();
+    const w = new LockWatchApp(msg);
+    watchApps.set(msg.attemptId, w);
+    w.render(true);
+  } else if ( msg.action === "state" ) {
+    app?.applyState(msg);
+  } else if ( msg.action === "end" ) {
+    watchApps.delete(msg.attemptId);
+    app?.finish(msg);
+  }
+}
+
 function onSocket(msg) {
   if ( !msg?.type ) return;
+  if ( msg.type === "watch" ) return onWatch(msg);
   if ( msg.type === "applied" ) {
     if ( msg.to !== game.user.id ) return;
     const resolve = pending.get(msg.requestId);

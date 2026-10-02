@@ -79,6 +79,32 @@ export class GamePanel {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Foundry canvas FPS cap while a lock window is open                 */
+/* ------------------------------------------------------------------ */
+
+let fpsHolders = 0;
+let fpsSaved = null;
+
+export function holdCanvasFps() {
+  const cap = Number(game.settings.get(MOD, "fpsWhilePicking") ?? 0);
+  const ticker = canvas?.app?.ticker;
+  if ( !cap || !ticker ) return;
+  if ( fpsHolders++ === 0 ) {
+    fpsSaved = ticker.maxFPS;
+    ticker.maxFPS = cap;
+  }
+}
+
+export function releaseCanvasFps() {
+  const ticker = canvas?.app?.ticker;
+  if ( fpsHolders === 0 ) return;
+  if ( --fpsHolders === 0 && ticker && fpsSaved !== null ) {
+    ticker.maxFPS = fpsSaved;
+    fpsSaved = null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  LockGameApp: one attempt on one lock                               */
 /* ------------------------------------------------------------------ */
 
@@ -127,21 +153,127 @@ export class LockGameApp extends ApplicationV2 {
   }
 
   _onRender() {
+    holdCanvasFps();
     this.panel.play(this.cfg.gameId, this.cfg.tier, success => {
       if ( this.resolved ) return;
       this.resolved = true;
+      this.#stopWatch(success);
       this.cfg.onResult?.(success, { cancelled: false });
       setTimeout(() => this.close(), 1400);
     });
+    this.#startWatch();
   }
 
   _onClose() {
+    releaseCanvasFps();
     const started = this.panel.started;
+    this.#stopWatch(null);
     this.panel.stop();
     if ( !this.resolved ) {
       this.resolved = true;
       this.cfg.onResult?.(false, { cancelled: true, started });
     }
+  }
+
+  /* Spectators: stream the game state over the socket ------------- */
+
+  #startWatch() {
+    const w = this.cfg.watch;
+    if ( !w?.emit ) return;
+    const g = this.panel.game;
+    if ( !g ) return;
+    this.watchId = foundry.utils.randomID();
+    w.emit({ action: "start", attemptId: this.watchId, gameId: this.cfg.gameId, tier: this.cfg.tier, info: { name: this.cfg.info?.name, actor: w.actorName }, state: g.snapshot(true), hint: g.hintText });
+    let lastHint = g.hintText;
+    this.watchTimer = setInterval(() => {
+      const game = this.panel.game;
+      if ( !game ) return;
+      const state = game.snapshot(false);
+      const hint = game.hintText !== lastHint ? (lastHint = game.hintText) : undefined;
+      if ( Object.keys(state).length || hint !== undefined ) w.emit({ action: "state", attemptId: this.watchId, state, hint });
+    }, 70);
+  }
+
+  #stopWatch(success) {
+    if ( !this.watchId ) return;
+    clearInterval(this.watchTimer);
+    this.cfg.watch?.emit({ action: "end", attemptId: this.watchId, success, state: this.panel.game?.snapshot(false) ?? {} });
+    this.watchId = null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  LockWatchApp: read-only view of someone else's attempt            */
+/* ------------------------------------------------------------------ */
+
+export class LockWatchApp extends ApplicationV2 {
+  static DEFAULT_OPTIONS = {
+    id: "lpm-watch-{id}",
+    classes: ["lpm", "lpm-game", "lpm-watch"],
+    window: { title: "LPM.Window.Watch", icon: "fa-solid fa-eye", resizable: false },
+    position: { width: 560 }
+  };
+
+  constructor(msg, options = {}) {
+    super(options);
+    this.msg = msg;
+    this.panel = new GamePanel();
+    this.game = null;
+  }
+
+  get title() {
+    return `${L("LPM.Window.Watch")} — ${this.msg.info?.actor ?? "?"} · ${this.msg.info?.name ?? ""}`;
+  }
+
+  async _renderHTML() {
+    const wrap = document.createElement("div");
+    wrap.className = "lpm-wrap";
+    wrap.innerHTML = `<div class="lpm-head"><span class="lpm-title">${esc(this.msg.info?.actor ?? "")}</span><span class="lpm-sub">${esc(this.msg.info?.name ?? "")} · ${gameLabel(this.msg.gameId)} · ${tierLabel(this.msg.tier)} <span class="lpm-dim">(${L("LPM.Watch.ReadOnly")})</span></span></div>`;
+    wrap.append(this.panel.root);
+    this.panel.root.classList.add("lpm-readonly");
+    return wrap;
+  }
+
+  _replaceHTML(result, content) {
+    content.replaceChildren(result);
+  }
+
+  _onRender() {
+    holdCanvasFps();
+    const Cls = GAMES[this.msg.gameId];
+    if ( !Cls ) return;
+    this.panel.howto.textContent = L(`LPM.HowTo.${Cls.id}`);
+    this.game = new Cls(this.panel.canvas, this.msg.tier, {
+      hint: text => { this.panel.hintEl.textContent = text; },
+      bars: b => {
+        this.panel.healthEl.style.width = `${Math.round(b.health * 100)}%`;
+        this.panel.rightEl.style.width = `${Math.round((b.right?.value ?? 0) * 100)}%`;
+        this.panel.rightLabel.textContent = b.rightLabel ?? "";
+        this.panel.rightText.textContent = b.right?.text ?? "";
+      },
+      done: () => {}
+    });
+    this.applyState(this.msg);
+  }
+
+  applyState(msg) {
+    if ( !this.game ) return;
+    if ( msg.state ) this.game.applySnapshot(msg.state);
+    if ( typeof msg.hint === "string" ) this.panel.hintEl.textContent = msg.hint;
+    try { this.game.draw(); this.game.pushBars(); } catch(err) { console.warn(`${MOD} | watch draw`, err); }
+  }
+
+  _onClose() {
+    releaseCanvasFps();
+  }
+
+  finish(msg) {
+    this.applyState(msg);
+    if ( msg.success === true || msg.success === false ) {
+      this.panel.overlay.textContent = L(msg.success ? "LPM.Result.Win" : "LPM.Result.Lose");
+      this.panel.overlay.className = `lpm-overlay ${msg.success ? "win" : "lose"}`;
+    }
+    setTimeout(() => this.close(), 2000);
   }
 }
 
@@ -182,6 +314,10 @@ export class DemoApp extends ApplicationV2 {
     content.replaceChildren(result);
   }
 
+  _onRender() {
+    holdCanvasFps();
+  }
+
   static #play() {
     const el = this.element;
     let gameId = el.querySelector("select[name=game]").value;
@@ -191,6 +327,7 @@ export class DemoApp extends ApplicationV2 {
   }
 
   _onClose() {
+    releaseCanvasFps();
     this.panel.stop();
   }
 }

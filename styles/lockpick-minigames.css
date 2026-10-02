@@ -220,3 +220,7 @@
 }
 
 .lpm-howto b { color: #c8b67a; }
+
+/* Spectator window */
+.lpm-readonly .lpm-stage canvas { cursor: default; pointer-events: none; }
+.lpm-watch .lpm-stage { border-color: #5a4f80; }

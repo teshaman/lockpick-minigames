@@ -3,6 +3,11 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.6.0 — 2026-10-02
+- Spectators: while a player picks a lock, everyone else (or only the GM, or nobody, per the world setting) gets a live read-only window of the same game; per-client opt-out; the window closes itself two seconds after the result.
+- Smoother play: cached background, dial and keyway layers, fewer DOM writes per frame, no shadow blur, and a per-client cap on Foundry's scene frame rate while a lock window is open (default 20 FPS, 0 to disable).
+- Pin Tumbler: a pin's first push in a round is always free; only pushing a pin that already sprang back this round costs pick health.
+
 ## 1.5.0 — 2026-10-02
 - New seventh minigame, Arcane Lock: runes orbit a sigil and flare in a sequence that grows each round; click them back in order while they keep moving. Wrong runes damage the pick and replay the sequence; a mana ring drains while casting and ends the attempt when empty. Higher tiers add runes and rounds, spin and flip the orbit, and shuffle rune positions between rounds.
 - Arcane Locks are never part of the random pick; choose them on a lock or in the playground. They ignore thieves' tools; on dnd5e Arcana plus the spellcasting ability modifier lower the tier (doubled when proficient in Arcana and a caster), other systems use the new arcane skill path setting.
