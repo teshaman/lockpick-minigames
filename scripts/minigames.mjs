@@ -125,7 +125,8 @@ export class MiniGame {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.tier = clamp(Math.round(Number(tier) || 1), 1, TIERS);
-    this.t = tierT(this.tier);
+    // Eased: mid tiers already bite (tier 10 ~ 0.73 instead of 0.64), tier 15 stays 1.
+    this.t = Math.pow(tierT(this.tier), 0.7);
     this.host = host;
     this.health = 100;
     this.running = false;
@@ -290,10 +291,10 @@ export class SweetSpotGame extends MiniGame {
     this.cx = this.W / 2; this.cy = this.H / 2 + 6;
     this.r = Math.min(this.W, this.H) * 0.4;
     this.sweet = rnd(0, TAU);
-    this.tol = lerp(12, 2.5, this.t) * Math.PI / 180;
-    this.soft = lerp(45, 12, this.t) * Math.PI / 180;
-    this.turnSpeed = lerp(75, 50, this.t) * Math.PI / 180;
-    this.drain = lerp(45, 110, this.t);
+    this.tol = lerp(10, 1.5, this.t) * Math.PI / 180;
+    this.soft = lerp(40, 8, this.t) * Math.PI / 180;
+    this.turnSpeed = lerp(75, 45, this.t) * Math.PI / 180;
+    this.drain = lerp(50, 140, this.t);
     this.rot = 0;
     this.maxRot = Math.PI / 2;
     this.pickAngle = Math.PI / 2;
@@ -365,18 +366,18 @@ export class DualRotationGame extends MiniGame {
     const a = rnd(0, TAU), d = rnd(0.2, 0.95) * this.bound;
     this.sx = this.cx + Math.cos(a) * d; this.sy = this.cy + Math.sin(a) * d;
     this.phase = "search";
-    this.searchRadius = lerp(150, 70, this.t);
-    this.captureFind = lerp(30, 12, this.t);
-    this.capture = lerp(48, 16, this.t);
-    this.speed = lerp(40, 150, this.t);
+    this.searchRadius = lerp(150, 50, this.t);
+    this.captureFind = lerp(28, 9, this.t);
+    this.capture = lerp(46, 12, this.t);
+    this.speed = lerp(40, 190, this.t);
     this.vx = 0; this.vy = 0;
     this.turnIn = 0;
     this.foundTimer = 0;
     this.heat = 0;
     this.rot = 0;
     this.aligned = false;
-    this.fillRate = lerp(40, 24, this.t) * Math.PI / 180;
-    this.drain = lerp(35, 85, this.t);
+    this.fillRate = lerp(40, 18, this.t) * Math.PI / 180;
+    this.drain = lerp(40, 110, this.t);
   }
 
   update(dt) {
@@ -432,8 +433,9 @@ export class DualRotationGame extends MiniGame {
       if ( this.mouse.x >= 0 && this.heat > 0 ) {
         const rad = 30 + 90 * this.heat;
         const g = ctx.createRadialGradient(this.mouse.x, this.mouse.y, 0, this.mouse.x, this.mouse.y, rad);
-        g.addColorStop(0, `rgba(255,236,160,${0.15 + 0.75 * this.heat})`);
-        g.addColorStop(1, "rgba(255,214,90,0)");
+        g.addColorStop(0, `rgba(190,230,255,${0.2 + 0.8 * this.heat})`);
+        g.addColorStop(0.5, `rgba(120,190,255,${0.35 * this.heat})`);
+        g.addColorStop(1, "rgba(90,160,255,0)");
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(this.mouse.x, this.mouse.y, rad, 0, TAU); ctx.fill();
       }
@@ -443,14 +445,23 @@ export class DualRotationGame extends MiniGame {
       }
       return;
     }
-    const g = ctx.createRadialGradient(this.sx, this.sy, 0, this.sx, this.sy, this.capture * 1.6);
-    g.addColorStop(0, "rgba(255,244,180,0.95)");
-    g.addColorStop(0.3, "rgba(255,214,90,0.5)");
-    g.addColorStop(1, "rgba(255,214,90,0)");
+    const halo = ctx.createRadialGradient(this.sx, this.sy, 0, this.sx, this.sy, this.capture * 1.5);
+    halo.addColorStop(0, "rgba(10,20,40,0.55)");
+    halo.addColorStop(0.6, "rgba(10,20,40,0.35)");
+    halo.addColorStop(1, "rgba(10,20,40,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(this.sx, this.sy, this.capture * 1.5, 0, TAU); ctx.fill();
+    const g = ctx.createRadialGradient(this.sx, this.sy, 0, this.sx, this.sy, this.capture);
+    g.addColorStop(0, "rgba(200,240,255,0.9)");
+    g.addColorStop(0.4, "rgba(90,190,255,0.45)");
+    g.addColorStop(1, "rgba(90,190,255,0)");
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(this.sx, this.sy, this.capture * 1.6, 0, TAU); ctx.fill();
-    ctx.fillStyle = "#ffe066";
+    ctx.beginPath(); ctx.arc(this.sx, this.sy, this.capture, 0, TAU); ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "rgba(140,220,255,0.9)";
+    ctx.beginPath(); ctx.arc(this.sx, this.sy, this.capture, 0, TAU); ctx.stroke();
+    ctx.fillStyle = "#ffffff";
     ctx.beginPath(); ctx.arc(this.sx, this.sy, 6, 0, TAU); ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "#0b1a2e"; ctx.stroke();
     if ( this.mouse.x >= 0 ) {
       ctx.lineWidth = 2;
       ctx.strokeStyle = this.aligned ? PALETTE.green : "rgba(255,255,255,0.55)";
@@ -474,10 +485,10 @@ export class PinTumblerGame extends MiniGame {
     this.n = Math.round(lerp(4, 8, this.t));
     this.errorsAllowed = Math.max(1, Math.round(lerp(6, 1, this.t)));
     this.errors = 0;
-    this.riseSpeed = lerp(1.1, 2.6, this.t);
+    this.riseSpeed = lerp(1.1, 3.2, this.t);
     this.fallSpeed = 3.2;
-    this.pause = lerp(0.7, 0.18, this.t);
-    const fakes = this.t > 0.55 ? Math.round(lerp(1, 3, (this.t - 0.55) / 0.45)) : 0;
+    this.pause = lerp(0.7, 0.13, this.t);
+    const fakes = this.t > 0.45 ? Math.round(lerp(1, 3, (this.t - 0.45) / 0.55)) : 0;
     this.pins = Array.from({ length: this.n }, () => ({
       notch: rnd(0.35, 0.95),
       fake: null,
@@ -644,13 +655,13 @@ export class SkillCheckGame extends MiniGame {
     this.cx = this.W / 2; this.cy = this.H / 2 + 10;
     this.R = Math.min(this.W, this.H) * 0.36;
     this.width = 34;
-    this.need = Math.round(lerp(3, 7, this.t));
+    this.need = Math.round(lerp(3, 8, this.t));
     this.hits = 0;
     this.a = rnd(0, TAU);
-    this.omega = lerp(2.0, 6.0, this.t) * sign();
-    this.zoneW = lerp(1.1, 0.28, this.t);
+    this.omega = lerp(2.0, 7.0, this.t) * sign();
+    this.zoneW = lerp(1.1, 0.2, this.t);
     this.capW = this.zoneW * 0.22;
-    this.drift = lerp(0.1, 1.1, this.t);
+    this.drift = lerp(0.1, 1.6, this.t);
     this.missDmg = lerp(40, 60, this.t);
     this.flash = 0;
     this.newZone();
@@ -743,21 +754,21 @@ export class TensionGame extends MiniGame {
   setup() {
     this.started = false;
     this.tension = 0;
-    this.rise = lerp(0.9, 1.6, this.t);
-    this.fall = lerp(0.7, 1.3, this.t);
-    this.bandHalf = lerp(0.15, 0.045, this.t);
+    this.rise = lerp(0.9, 1.9, this.t);
+    this.fall = lerp(0.7, 1.4, this.t);
+    this.bandHalf = lerp(0.15, 0.035, this.t);
     this.bandC = rnd(0.35, 0.65);
-    this.bandV = lerp(0.05, 0.28, this.t) * sign();
-    this.need = Math.round(lerp(4, 9, this.t));
+    this.bandV = lerp(0.05, 0.36, this.t) * sign();
+    this.need = Math.round(lerp(4, 10, this.t));
     this.count = 0;
     this.gx = 56; this.gw = 34; this.gTop = 50; this.gBot = this.H - 44;
     this.cx = this.W / 2 + 36; this.cy = this.H / 2 + 8;
     this.r = Math.min(this.W, this.H) * 0.36;
     this.target = null;
-    this.ttl = lerp(3.5, 1.6, this.t);
+    this.ttl = lerp(3.5, 1.3, this.t);
     this.targetTTL = 0;
-    this.missDmg = lerp(30, 45, this.t);
-    this.expireDmg = lerp(0, 25, this.t);
+    this.missDmg = lerp(30, 50, this.t);
+    this.expireDmg = lerp(0, 35, this.t);
     this.gaugeHeld = false;
     this.flash = 0;
     this.pulse = 0;
@@ -1097,15 +1108,15 @@ export class WardTraceGame extends MiniGame {
   static hintKey = "LPM.Hint.trace";
 
   setup() {
-    this.halfW = lerp(30, 9, this.t);
+    this.halfW = lerp(30, 7, this.t);
     const names = this.t < 0.2 ? ["zigzag", "wave", "stairs"]
       : (this.t < 0.5 ? ["zigzag", "wave", "stairs", "serpentine", "hairpins", "walk", "orbit"] : Object.keys(KEYWAYS));
     this.kind = pick(names);
     this.build(this.kind);
-    this.fog = this.t > 0.5 ? lerp(230, 80, (this.t - 0.5) * 2) : 0;
+    this.fog = this.t > 0.4 ? lerp(220, 60, (this.t - 0.4) / 0.6) : 0;
     this.state = "idle";
     this.progress = 0;
-    this.hitDmg = lerp(40, 100, this.t);
+    this.hitDmg = lerp(45, 100, this.t);
     this.flash = 0;
   }
 

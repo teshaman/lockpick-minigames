@@ -3,6 +3,10 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.2.0 — 2026-10-02
+- Dual Rotation: the hidden spot is now a blue ring with a white core and a dark halo, and the search glow is cool blue-white, so it stands out on the brass dial.
+- Harder difficulty curve: mid tiers are eased upward (tier 10 plays at about 73 percent of the scale instead of 64) and the top-end values are harsher in every game (tighter sweet spot and tracking radius, faster pins with shorter pauses and earlier fakes, narrower and faster-drifting skill arc with more hits, thinner tension band with faster drift and more targets, narrower keyways with earlier fog).
+
 ## 1.1.1 — 2026-10-02
 - dnd5e skill formula: the flat amount of a carried thieves' tool now joins the skill points (Sleight of Hand + tool proficiency bonus + carried tool, doubled when proficient in both), so an unproficient character with tools still benefits; carried tools are no longer a separate reduction on dnd5e.
 
