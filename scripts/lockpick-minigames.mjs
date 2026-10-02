@@ -184,16 +184,26 @@ function bestTool(actor) {
  * doubled when proficient in both, divided by the skill divisor.
  * Otherwise: the number at the skill path divided by the divisor.
  */
-function skillReduction(actor) {
+const usesDndFormula = () => game.system.id === "dnd5e" && S("dndFormula");
+
+/**
+ * How much the character's ability lowers the tier.
+ * dnd5e formula (default on dnd5e): Sleight of Hand total + thieves' tools proficiency bonus
+ * + the flat amount of the best carried tool (from the tools setting), doubled when proficient
+ * in both the skill and the tools, divided by the skill divisor. The carried tool is part of
+ * the points here, not a separate reduction.
+ * Otherwise: the number at the skill path divided by the divisor (the carried tool is a separate reduction).
+ */
+function skillReduction(actor, tool = null) {
   const div = Math.max(1, S("skillDivisor"));
-  if ( game.system.id === "dnd5e" && S("dndFormula") ) {
+  if ( usesDndFormula() ) {
     const sys = actor.system ?? {};
     const slt = sys.skills?.slt;
-    const tool = sys.tools?.thief;
+    const thief = sys.tools?.thief;
     const prof = Number(sys.attributes?.prof ?? 0);
     const sltTotal = Number(slt?.total ?? 0);
-    const toolMult = Number(tool?.value ?? tool?.prof?.multiplier ?? 0);
-    let points = sltTotal + Math.floor(toolMult * prof);
+    const toolMult = Number(thief?.value ?? thief?.prof?.multiplier ?? 0);
+    let points = sltTotal + Math.floor(toolMult * prof) + Number(tool?.reduction ?? 0);
     if ( Number(slt?.value ?? 0) >= 1 && toolMult >= 1 ) points *= 2;
     return Math.floor(points / div);
   }
@@ -240,14 +250,15 @@ async function attempt(doc, { test = false } = {}) {
 
   const tool = actor ? bestTool(actor) : null;
   if ( !test && S("requireTool") && !tool ) return warn("LPM.Notify.NeedTool");
-  const skill = actor ? skillReduction(actor) : 0;
-  const tier = clamp(lock.tier - skill - (tool?.reduction ?? 0), 1, TIERS);
+  const skill = actor ? skillReduction(actor, tool) : 0;
+  const toolRed = usesDndFormula() ? 0 : (tool?.reduction ?? 0);
+  const tier = clamp(lock.tier - skill - toolRed, 1, TIERS);
   const gameId = lock.game === "random" || !(lock.game in GAMES) ? randomGameId() : lock.game;
 
   if ( openApps.has(doc.uuid) ) return openApps.get(doc.uuid).bringToFront?.();
   const app = new LockGameApp({
     gameId, tier,
-    info: { name: docName(doc), baseTier: lock.tier, skill, tool },
+    info: { name: docName(doc), baseTier: lock.tier, skill, tool: toolRed ? tool : (tool ? { name: tool.name, reduction: 0 } : null) },
     onResult: (success, { cancelled, started } = {}) => {
       openApps.delete(doc.uuid);
       if ( test ) return;

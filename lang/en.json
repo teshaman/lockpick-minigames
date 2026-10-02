@@ -142,7 +142,7 @@
   "LPM.Setting.skillDivisor.Name": "Skill divisor",
   "LPM.Setting.skillDivisor.Hint": "The tier drops by floor(skill points / divisor). On dnd5e the points are Sleight of Hand + thieves' tools proficiency (doubled with both).",
   "LPM.Setting.tools.Name": "Lock-picking tools",
-  "LPM.Setting.tools.Hint": "Item names with their tier reduction, separated by semicolons: Thieves' Tools=2; Masterwork Picks=4. The best tool carried counts.",
+  "LPM.Setting.tools.Hint": "Item names with their amount, separated by semicolons: Thieves' Tools=2; Masterwork Picks=4. The best tool carried counts. On dnd5e the amount joins the skill points (so an unproficient character with tools still gets it); elsewhere it lowers the tier directly.",
   "LPM.Setting.requireTool.Name": "Tools required",
   "LPM.Setting.requireTool.Hint": "Players without one of the tools above cannot attempt a lock.",
   "LPM.Setting.toolBreakChance.Name": "Tool break chance on failure (%)",
@@ -161,5 +161,5 @@
   "LPM.HowTo.tension": "Click the dial to start. Tension builds while you hold SPACE, the right mouse button, or the left button on the gauge; it falls when you release. Keep the marker inside the green band, which drifts up and down. While the marker is in the band, left-click the glowing target on the dial; clicking it outside the band is a miss. Targets expire (the ring around them counts down) and reappear elsewhere. Letting the marker reach the red cap burns the pick.",
   "LPM.HowTo.trace": "Click the green S marker, then move the cursor along the dark keyway to the yellow E marker without touching the walls. A touch damages the pick and sends you back to S. Every attempt draws a different keyway: zigzags, waves, stairs, switchbacks, hairpins, orbits, petals, spirals, grid walks and grid mazes. In a maze every corridor is safe to enter, but only the true route fills the progress bar, so dead ends cost time. Higher tiers are narrower and longer, and from tier 8 the keyway is only visible near your cursor.",
   "LPM.Setting.dndFormula.Name": "dnd5e skill formula",
-  "LPM.Setting.dndFormula.Hint": "Sleight of Hand total plus the thieves' tools proficiency bonus, doubled when the character is proficient in both, divided by the skill divisor. Off: use the skill attribute path below."
+  "LPM.Setting.dndFormula.Hint": "Points = Sleight of Hand total + thieves' tools proficiency bonus + the flat amount of the best carried tool from the tools list; doubled when proficient in both the skill and the tools; the tier drops by floor(points / divisor). Off: use the skill attribute path below, with carried tools as a separate reduction."
 }

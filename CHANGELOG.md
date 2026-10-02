@@ -3,6 +3,9 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.1.1 — 2026-10-02
+- dnd5e skill formula: the flat amount of a carried thieves' tool now joins the skill points (Sleight of Hand + tool proficiency bonus + carried tool, doubled when proficient in both), so an unproficient character with tools still benefits; carried tools are no longer a separate reduction on dnd5e.
+
 ## 1.1.0 — 2026-10-02
 - Sweet Spot: the pick travels the full circle, one pick, strain reddens it before it breaks.
 - Dual Rotation: new hot/cold search phase before tracking the wandering spot.
