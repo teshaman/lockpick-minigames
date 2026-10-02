@@ -3,6 +3,10 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.5.0 — 2026-10-02
+- New seventh minigame, Arcane Lock: runes orbit a sigil and flare in a sequence that grows each round; click them back in order while they keep moving. Wrong runes damage the pick and replay the sequence; a mana ring drains while casting and ends the attempt when empty. Higher tiers add runes and rounds, spin and flip the orbit, and shuffle rune positions between rounds.
+- Arcane Locks are never part of the random pick; choose them on a lock or in the playground. They ignore thieves' tools; on dnd5e Arcana plus the spellcasting ability modifier lower the tier (doubled when proficient in Arcana and a caster), other systems use the new arcane skill path setting.
+
 ## 1.4.1 — 2026-10-02
 - Sweet Spot: the dial no longer glows on the sweet spot above tier 2, so the partial turn is the only feedback.
 - Tension: the gauge falls about half as fast when released.

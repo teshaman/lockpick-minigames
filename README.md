@@ -17,8 +17,9 @@ Press **L** to pick the nearest lock in reach.
 | Skill Check Lock | A needle sweeps the ring while the highlighted arc drifts the other way. Click or press Space inside the arc: yellow counts one, the thin blue caps count two. A red trap arc makes a miss cost half again as much, and from tier 8 the needle breathes. |
 | Tension Lock | Click the dial to start. Hold Space, the right mouse button, or the left button on the gauge to build tension; keep the marker in the moving (and, from tier 7, breathing) green band and left-click the glowing targets before their ring runs out. From tier 10 the pick slips and tension drops suddenly. The red cap burns the pick. |
 | Ward Trace Lock | Click S and trace the keyway to E without touching the walls. Ten pattern families (zigzag, wave, stairs, switchbacks, hairpins, orbits, petals, spirals, grid walks, grid mazes with safe dead ends); higher tiers are narrower, longer and fogged except near the cursor, and from tier 9 the walls breathe and a timer runs. |
+| Arcane Lock | A magical ward. Runes orbit a sigil and flare in a sequence that grows each round; click them back in order while they keep moving. Wrong runes damage the pick and replay the sequence; the mana ring drains while you cast and ends the attempt when empty. Not part of the random pick: choose it on a lock. Tools do not apply; on dnd5e Arcana plus the spellcasting modifier lower the tier (doubled when proficient in Arcana and a caster). Higher tiers add runes and rounds, spin and flip the orbit, and shuffle rune positions between rounds. |
 
-Every lock window shows a short "How to" text under the bars. Fifteen difficulty tiers (Trivial to Legendary) scale every game: narrower zones, faster movement, more pins and targets, shorter pauses, fewer allowed errors.
+Every lock window shows a short "How to" text under the bars. A failed Arcane Lock can alert the caster who placed it through the lock's failure macro. Fifteen difficulty tiers (Trivial to Legendary) scale every game: narrower zones, faster movement, more pins and targets, shorter pauses, fewer allowed errors.
 
 ## What GMs get
 
@@ -33,10 +34,6 @@ Every lock window shows a short "How to" text under the bars. Fifteen difficulty
 - **Chat**: every outcome is whispered to the GM and the player.
 
 An active GM client must be connected; players never write to the scene themselves.
-
-## Ideas not built yet
-
-- **Arcane Lock (locked by magic)**: a seventh minigame for doors and chests sealed with a spell. Glowing glyphs orbit a sigil in the middle of the dial; the player must "attune" by tracing the glyphs in the order they flare, while a mana ring drains the longer they take. Mechanically it could use Arcana instead of Sleight of Hand in the skill formula, ignore thieves' tools, and let a caster spend a spell slot to lower the tier or skip the game (Knock, Dispel Magic), with a failed attempt alerting the caster who placed the ward (a macro hook).
 
 ## API
 

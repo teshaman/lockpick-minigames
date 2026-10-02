@@ -161,7 +161,17 @@
   "LPM.HowTo.tension": "Click the dial to start. Tension builds while you hold SPACE, the right mouse button, or the left button on the gauge; it falls when you release. Keep the marker inside the green band, which drifts up and down and, from tier 7, breathes wider and narrower. While the marker is in the band, left-click the glowing target on the dial; clicking it outside the band is a miss. Targets expire (the ring around them counts down) and reappear elsewhere. From tier 10 the pick slips now and then (the gauge flashes red) and tension drops suddenly. Letting the marker reach the red cap burns the pick.",
   "LPM.HowTo.trace": "Click the green S marker, then move the cursor along the dark keyway to the yellow E marker without touching the walls. A touch damages the pick and sends you back to S. Every attempt draws a different keyway: zigzags, waves, stairs, switchbacks, hairpins, orbits, petals, spirals, grid walks and grid mazes. In a maze every corridor is safe to enter, but only the true route fills the progress bar, so dead ends cost time. Higher tiers are narrower and longer, from tier 7 the keyway is only visible near your cursor, and from tier 9 the walls breathe and a timer at the top runs while you trace: run out and the wards reset.",
   "LPM.Setting.dndFormula.Name": "dnd5e skill formula",
-  "LPM.Setting.dndFormula.Hint": "Points = Sleight of Hand total + thieves' tools proficiency bonus + the flat amount of the best carried tool from the tools list; doubled when proficient in both the skill and the tools; the tier drops by floor(points / divisor). Off: use the skill attribute path below, with carried tools as a separate reduction.",
+  "LPM.Setting.dndFormula.Hint": "Points = Sleight of Hand total + thieves' tools proficiency bonus + the flat amount of the best carried tool from the tools list; doubled when proficient in both the skill and the tools; the tier drops by floor(points / divisor). Off: use the skill attribute path below, with carried tools as a separate reduction. Arcane Locks use Arcana total + the spellcasting ability modifier instead, doubled when proficient in Arcana and a caster, and ignore tools.",
   "LPM.Hint.sweetSettled": "The mechanism settled; the sweet spot shifted a little.",
-  "LPM.Hint.traceTime": "Too slow: the wards reset."
+  "LPM.Hint.traceTime": "Too slow: the wards reset.",
+  "LPM.Game.arcane": "Arcane Lock",
+  "LPM.Bar.Rounds": "Sigils",
+  "LPM.Hint.arcane": "The ward is waking. Watch which runes flare, then click them in the same order while they orbit.",
+  "LPM.Hint.arcaneWatch": "Watch the runes flare…",
+  "LPM.Hint.arcaneCast": "Cast: click the runes in the order they flared. The mana ring drains while you cast.",
+  "LPM.Hint.arcaneDrained": "The mana ring is empty; the ward snaps shut.",
+  "LPM.Arcane.Watch": "Watch",
+  "LPM.HowTo.arcane": "A magical ward, not a mechanism: thieves' tools do not help, and on dnd5e your Arcana skill and spellcasting modifier lower the tier instead of Sleight of Hand. Runes orbit a sigil. Each round one more rune flares in sequence; watch the order, then click the runes back in that order while they keep orbiting. A correct rune pulses blue; a wrong one flashes red, damages the pick and replays the sequence. The number in the sigil shows the round you are on and how many are needed. The violet mana ring around the dial drains only while you are casting (not while watching), and when it empties the ward snaps shut. Higher tiers add runes and rounds, flare faster, spin faster, reverse the orbit without warning, and shuffle the runes' places between rounds, so learn the shapes, not the positions.",
+  "LPM.Setting.arcanePath.Name": "Arcane skill attribute path",
+  "LPM.Setting.arcanePath.Hint": "Used by Arcane Locks when the dnd5e formula is off or on other systems: actor data path of the number that lowers the difficulty, e.g. system.skills.arc.total. Leave empty for none."
 }

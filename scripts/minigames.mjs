@@ -1408,6 +1408,236 @@ export class WardTraceGame extends MiniGame {
 }
 
 /* ------------------------------------------------------------------ */
+/*  7. Arcane Lock — orbiting runes flare in a growing sequence         */
+/* ------------------------------------------------------------------ */
+
+export class ArcaneLockGame extends MiniGame {
+  static id = "arcane";
+  static rightLabel = "LPM.Bar.Rounds";
+  static hintKey = "LPM.Hint.arcane";
+  static excludeFromRandom = true;
+
+  setup() {
+    this.cx = this.W / 2; this.cy = this.H / 2 + 8;
+    this.r = Math.min(this.W, this.H) * 0.4;
+    this.orbitR = this.r * 0.66;
+    this.n = Math.round(lerp(4, 8, this.t));
+    this.target = Math.round(lerp(3, 7, this.t));
+    this.omega = lerp(0.3, 1.3, this.t) * sign();
+    this.flips = this.t >= 0.55;
+    this.flipIn = rnd(2, 4);
+    this.shuffles = this.t >= 0.5;
+    this.flareDur = lerp(0.65, 0.3, this.t);
+    this.gap = lerp(0.25, 0.15, this.t);
+    this.missDmg = lerp(30, 45, this.t);
+    this.mana = lerp(45, 24, this.t);
+    this.manaMax = this.mana;
+    this.angle = rnd(0, TAU);
+    this.glyphs = Array.from({ length: this.n }, (_, i) => ({
+      slot: i,
+      strokes: ArcaneLockGame.makeRune(),
+      flare: 0,
+      pulse: 0,
+      bad: 0
+    }));
+    this.seq = [];
+    this.round = 0;
+    this.phase = "idle";
+    this.delay = 0.8;
+    this.showIdx = 0;
+    this.showT = 0;
+    this.inputIdx = 0;
+    this.time = 0;
+  }
+
+  /** A small original rune: 3-4 strokes between points of a 3x3 grid. */
+  static makeRune() {
+    const pts = [];
+    for ( let y = -1; y <= 1; y++ ) for ( let x = -1; x <= 1; x++ ) pts.push([x, y]);
+    const strokes = [];
+    let from = pts[Math.floor(Math.random() * 9)];
+    const k = 3 + Math.floor(Math.random() * 2);
+    for ( let i = 0; i < k; i++ ) {
+      let to = pts[Math.floor(Math.random() * 9)];
+      if ( to === from ) to = pts[(pts.indexOf(from) + 4) % 9];
+      strokes.push([from, to]);
+      from = Math.random() < 0.6 ? to : pts[Math.floor(Math.random() * 9)];
+    }
+    return strokes;
+  }
+
+  glyphPos(g) {
+    const a = this.angle + g.slot * TAU / this.n;
+    return { x: this.cx + Math.cos(a) * this.orbitR, y: this.cy + Math.sin(a) * this.orbitR };
+  }
+
+  startRound() {
+    let next = Math.floor(Math.random() * this.n);
+    if ( this.seq.length && next === this.seq[this.seq.length - 1] ) next = (next + 1) % this.n;
+    this.seq.push(next);
+    this.round = this.seq.length;
+    if ( this.shuffles && this.round > 1 ) {
+      const slots = this.glyphs.map(g => g.slot).sort(() => Math.random() - 0.5);
+      this.glyphs.forEach((g, i) => { g.slot = slots[i]; });
+    }
+    this.replay();
+  }
+
+  replay() {
+    this.phase = "show";
+    this.showIdx = 0;
+    this.showT = 0;
+    this.inputIdx = 0;
+    this.hint("LPM.Hint.arcaneWatch");
+  }
+
+  update(dt) {
+    this.time += dt;
+    if ( this.flips ) {
+      this.flipIn -= dt;
+      if ( this.flipIn <= 0 ) { this.omega *= -1; this.flipIn = rnd(2, 4); }
+    }
+    this.angle += this.omega * dt;
+    for ( const g of this.glyphs ) {
+      g.flare = Math.max(0, g.flare - dt * 3);
+      g.pulse = Math.max(0, g.pulse - dt * 3);
+      g.bad = Math.max(0, g.bad - dt * 3);
+    }
+    if ( this.phase === "idle" ) {
+      this.delay -= dt;
+      if ( this.delay <= 0 ) this.startRound();
+      return;
+    }
+    if ( this.phase === "show" ) {
+      this.showT += dt;
+      const g = this.glyphs[this.seq[this.showIdx]];
+      if ( this.showT < this.flareDur ) g.flare = 1;
+      if ( this.showT >= this.flareDur + this.gap ) {
+        this.showIdx += 1;
+        this.showT = 0;
+        if ( this.showIdx >= this.seq.length ) {
+          this.phase = "input";
+          this.inputIdx = 0;
+          this.hint("LPM.Hint.arcaneCast");
+        }
+      }
+      return;
+    }
+    if ( this.phase === "input" ) {
+      this.mana -= dt;
+      if ( this.mana <= 0 ) { this.mana = 0; this.hint("LPM.Hint.arcaneDrained"); this.fail(); }
+    }
+  }
+
+  onDown(x, y) {
+    if ( this.phase !== "input" ) return;
+    let hit = null, best = 24;
+    for ( const g of this.glyphs ) {
+      const p = this.glyphPos(g);
+      const d = Math.hypot(x - p.x, y - p.y);
+      if ( d < best ) { best = d; hit = g; }
+    }
+    if ( !hit ) return;
+    const idx = this.glyphs.indexOf(hit);
+    if ( idx === this.seq[this.inputIdx] ) {
+      hit.pulse = 1;
+      this.inputIdx += 1;
+      if ( this.inputIdx >= this.seq.length ) {
+        if ( this.seq.length >= this.target ) return this.win();
+        this.phase = "idle";
+        this.delay = 0.6;
+      }
+    } else {
+      hit.bad = 1;
+      this.damage(this.missDmg);
+      if ( this.running ) this.replay();
+    }
+  }
+
+  drawRune(ctx, g, x, y, size, color, width) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    for ( const [a, b] of g.strokes ) {
+      ctx.moveTo(a[0] * size, a[1] * size);
+      ctx.lineTo(b[0] * size, b[1] * size);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  draw() {
+    const ctx = this.ctx;
+    drawBackground(ctx, this.W, this.H, 0);
+    const tint = ctx.createRadialGradient(this.cx, this.cy, 10, this.cx, this.cy, this.r * 1.3);
+    tint.addColorStop(0, "rgba(110,70,200,0.28)");
+    tint.addColorStop(1, "rgba(60,30,120,0)");
+    ctx.fillStyle = tint;
+    ctx.fillRect(0, 0, this.W, this.H);
+    // dark stone dial
+    const dome = ctx.createRadialGradient(this.cx - this.r * 0.3, this.cy - this.r * 0.3, 10, this.cx, this.cy, this.r);
+    dome.addColorStop(0, "#2d2a44");
+    dome.addColorStop(1, "#110f1e");
+    ctx.fillStyle = dome;
+    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "#4a3f7a"; ctx.lineWidth = 2; ctx.stroke();
+    // mana ring
+    const frac = clamp(this.mana / this.manaMax, 0, 1);
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = "#231c3a";
+    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.r + 9, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = frac < 0.25 ? PALETTE.red : "#9f7bff";
+    ctx.shadowColor = "#9f7bff"; ctx.shadowBlur = frac < 0.25 ? 0 : 8;
+    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.r + 9, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke();
+    ctx.shadowBlur = 0;
+    // orbit track
+    ctx.lineWidth = 1; ctx.strokeStyle = "rgba(159,123,255,0.25)";
+    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.orbitR, 0, TAU); ctx.stroke();
+    // central sigil
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+    ctx.rotate(-this.angle * 0.5);
+    ctx.strokeStyle = this.phase === "input" ? "#c9b3ff" : "#6f5bb3";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, this.r * 0.26, 0, TAU); ctx.stroke();
+    ctx.beginPath();
+    for ( let i = 0; i < 7; i++ ) {
+      const a = i * 3 * TAU / 7;
+      const x = Math.cos(a) * this.r * 0.26, y = Math.sin(a) * this.r * 0.26;
+      if ( i === 0 ) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.restore();
+    label(ctx, `${this.round}/${this.target}`, this.cx, this.cy, { size: 16, bold: true, color: "#d8ccff" });
+    // glyphs
+    for ( const g of this.glyphs ) {
+      const p = this.glyphPos(g);
+      const lit = Math.max(g.flare, g.pulse);
+      if ( lit > 0 || g.bad > 0 ) {
+        const col = g.bad > 0 ? `rgba(255,80,80,${0.6 * g.bad})` : (g.pulse > g.flare ? `rgba(120,230,255,${0.7 * lit})` : `rgba(240,225,255,${0.8 * lit})`);
+        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 34);
+        glow.addColorStop(0, col);
+        glow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 34, 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = "#1a1530";
+      ctx.beginPath(); ctx.arc(p.x, p.y, 17, 0, TAU); ctx.fill();
+      ctx.strokeStyle = lit > 0.3 ? "#f0e6ff" : "#5d4f99"; ctx.lineWidth = 1.5; ctx.stroke();
+      const color = g.bad > 0 ? "#ff8080" : (g.flare > 0.3 ? "#ffffff" : (g.pulse > 0.3 ? "#9fe8ff" : "#a98cff"));
+      this.drawRune(ctx, g, p.x, p.y, 6, color, 2);
+    }
+    if ( this.phase === "show" ) label(ctx, game.i18n.localize("LPM.Arcane.Watch"), this.cx, this.H - 22, { size: 11, color: "#8f7fc0" });
+  }
+
+  right() { return { value: this.round / this.target, text: `${this.round}/${this.target}` }; }
+}
+
+/* ------------------------------------------------------------------ */
 
 export const GAMES = {
   sweetspot: SweetSpotGame,
@@ -1415,14 +1645,16 @@ export const GAMES = {
   tumbler: PinTumblerGame,
   skillcheck: SkillCheckGame,
   tension: TensionGame,
-  trace: WardTraceGame
+  trace: WardTraceGame,
+  arcane: ArcaneLockGame
 };
 
 export function gameLabel(id) {
   return game.i18n.localize(`LPM.Game.${id in GAMES ? id : "random"}`);
 }
 
+/** Random pick among the mundane locks; the Arcane Lock must be chosen on purpose. */
 export function randomGameId() {
-  const ids = Object.keys(GAMES);
+  const ids = Object.keys(GAMES).filter(id => !GAMES[id].excludeFromRandom);
   return ids[Math.floor(Math.random() * ids.length)];
 }

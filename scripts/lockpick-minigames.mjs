@@ -58,6 +58,7 @@ function registerSettings() {
   reg("cooldown", { type: Number, default: 0, range: { min: 0, max: 600, step: 5 } });
   reg("dndFormula", { type: Boolean, default: isDnd, config: isDnd });
   reg("skillPath", { type: String, default: isDnd ? "system.skills.slt.total" : "" });
+  reg("arcanePath", { type: String, default: isDnd ? "system.skills.arc.total" : "" });
   reg("skillDivisor", { type: Number, default: 2, range: { min: 1, max: 10, step: 1 } });
   reg("tools", { type: String, default: isDnd ? "Thieves' Tools=2" : "" });
   reg("requireTool", { type: Boolean, default: false });
@@ -187,6 +188,26 @@ function bestTool(actor) {
 const usesDndFormula = () => game.system.id === "dnd5e" && S("dndFormula");
 
 /**
+ * Arcane locks ignore thieves' tools. dnd5e: Arcana total + the spellcasting ability modifier
+ * (casters only), doubled when proficient in Arcana and a caster. Otherwise the arcane path.
+ */
+function arcaneReduction(actor, div) {
+  if ( usesDndFormula() ) {
+    const sys = actor.system ?? {};
+    const arc = sys.skills?.arc;
+    const abl = sys.attributes?.spellcasting;
+    const mod = abl ? Number(sys.abilities?.[abl]?.mod ?? 0) : 0;
+    let points = Number(arc?.total ?? 0) + mod;
+    if ( Number(arc?.value ?? 0) >= 1 && abl ) points *= 2;
+    return Math.floor(points / div);
+  }
+  const path = String(S("arcanePath") ?? "").trim();
+  if ( !path ) return 0;
+  const v = Number(foundry.utils.getProperty(actor, path));
+  return Number.isFinite(v) ? Math.floor(v / div) : 0;
+}
+
+/**
  * How much the character's ability lowers the tier.
  * dnd5e formula (default on dnd5e): Sleight of Hand total + thieves' tools proficiency bonus
  * + the flat amount of the best carried tool (from the tools setting), doubled when proficient
@@ -194,8 +215,9 @@ const usesDndFormula = () => game.system.id === "dnd5e" && S("dndFormula");
  * the points here, not a separate reduction.
  * Otherwise: the number at the skill path divided by the divisor (the carried tool is a separate reduction).
  */
-function skillReduction(actor, tool = null) {
+function skillReduction(actor, tool = null, arcane = false) {
   const div = Math.max(1, S("skillDivisor"));
+  if ( arcane ) return arcaneReduction(actor, div);
   if ( usesDndFormula() ) {
     const sys = actor.system ?? {};
     const slt = sys.skills?.slt;
@@ -248,12 +270,13 @@ async function attempt(doc, { test = false } = {}) {
     }
   }
 
-  const tool = actor ? bestTool(actor) : null;
-  if ( !test && S("requireTool") && !tool ) return warn("LPM.Notify.NeedTool");
-  const skill = actor ? skillReduction(actor, tool) : 0;
-  const toolRed = usesDndFormula() ? 0 : (tool?.reduction ?? 0);
-  const tier = clamp(lock.tier - skill - toolRed, 1, TIERS);
   const gameId = lock.game === "random" || !(lock.game in GAMES) ? randomGameId() : lock.game;
+  const arcane = gameId === "arcane";
+  const tool = actor && !arcane ? bestTool(actor) : null;
+  if ( !test && !arcane && S("requireTool") && !tool ) return warn("LPM.Notify.NeedTool");
+  const skill = actor ? skillReduction(actor, tool, arcane) : 0;
+  const toolRed = usesDndFormula() || arcane ? 0 : (tool?.reduction ?? 0);
+  const tier = clamp(lock.tier - skill - toolRed, 1, TIERS);
 
   if ( openApps.has(doc.uuid) ) return openApps.get(doc.uuid).bringToFront?.();
   const app = new LockGameApp({
