@@ -137,7 +137,7 @@ export class LockGameApp extends ApplicationV2 {
   async _renderHTML() {
     const info = this.cfg.info ?? {};
     const mods = [];
-    if ( info.skill ) mods.push(`${L("LPM.Mod.Skill")} ${info.skill > 0 ? "−" : "+"}${Math.abs(info.skill)}`);
+    if ( info.skill ) mods.push(`${info.skillLabel ?? L("LPM.Mod.Skill")} ${info.skill > 0 ? "−" : "+"}${Math.abs(info.skill)}`);
     if ( info.tool?.reduction ) mods.push(`${esc(info.tool.name)} −${info.tool.reduction}`);
     const sub = `${gameLabel(this.cfg.gameId)} · ${tierLabel(this.cfg.tier)}`
       + (info.baseTier && info.baseTier !== this.cfg.tier ? ` <span class="lpm-dim">(${L("LPM.Mod.Base")} ${info.baseTier}${mods.length ? ": " + mods.join(", ") : ""})</span>` : "");

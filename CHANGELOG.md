@@ -3,6 +3,9 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.7.1 — 2026-10-02
+- The lock window header now names the skill that lowered the tier: Arcana for Arcane Locks, Sleight of Hand + tools for the others.
+
 ## 1.7.0 — 2026-10-02
 - Spectating is opt-in: other players get a small prompt at the top of the screen (X is picking Y, Watch) and join the live view at its current state only if they press Watch; per-client choice between prompt, open automatically, or never.
 - Locks on items: configure a lock on any item (collar, manacles, strongbox in a pack) from the lock button in its sheet header; owners get a Pick lock header button, anyone in reach of the wearer's token can use the L hotkey. On success the item can be marked unlocked, unequipped, or removed from the inventory.

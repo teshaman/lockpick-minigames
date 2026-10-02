@@ -195,5 +195,7 @@
   "LPM.Config.OnUnlockNone": "Just mark it unlocked",
   "LPM.Config.OnUnlockUnequip": "Unequip it",
   "LPM.Config.OnUnlockRemove": "Remove it from the inventory",
-  "LPM.Config.OnUnlockHint": "For locked items such as collars, manacles or a strongbox carried in a pack."
+  "LPM.Config.OnUnlockHint": "For locked items such as collars, manacles or a strongbox carried in a pack.",
+  "LPM.Mod.Arcana": "Arcana",
+  "LPM.Mod.Sleight": "Sleight of Hand + tools"
 }

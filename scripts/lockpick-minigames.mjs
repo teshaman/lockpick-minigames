@@ -312,7 +312,7 @@ async function attempt(doc, { test = false } = {}) {
   } : null;
   const app = new LockGameApp({
     gameId, tier, watch,
-    info: { name: docName(doc), baseTier: lock.tier, skill, tool: toolRed ? tool : (tool ? { name: tool.name, reduction: 0 } : null) },
+    info: { name: docName(doc), baseTier: lock.tier, skill, skillLabel: L(arcane ? "LPM.Mod.Arcana" : (usesDndFormula() ? "LPM.Mod.Sleight" : "LPM.Mod.Skill")), tool: toolRed ? tool : (tool ? { name: tool.name, reduction: 0 } : null) },
     onResult: (success, { cancelled, started } = {}) => {
       openApps.delete(doc.uuid);
       if ( test ) return;
