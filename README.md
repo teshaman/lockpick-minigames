@@ -11,14 +11,14 @@ Press **L** to pick the nearest lock in reach.
 
 | Minigame | How it plays |
 |---|---|
-| Sweet Spot Lock | Move the pick around the dial to find the sweet spot, hold the mouse button to turn the lock. Turning in the wrong place strains the pick. |
-| Dual Rotation Lock | Hold Space (or the mouse button) while keeping the cursor on a drifting glow. |
-| Pin Tumbler Lock | Click each bouncing pin at the top of its travel. Limited errors. |
-| Skill Check Lock | Click or press Space when the sweeping needle is inside the highlighted arc; the blue centre counts double. |
-| Tension Lock | Hold Space to build tension inside a moving green band while clicking the glowing targets on the dial. |
-| Ward Trace Lock | Click S, then trace the cursor along a winding keyway to E without touching the walls. |
+| Sweet Spot Lock | The pick follows the mouse through a full circle. Hold the left button to turn the cylinder; on the sweet spot it turns all the way, elsewhere it stops part-way and the pick strains, reddens and breaks. One pick. |
+| Dual Rotation Lock | Two phases. Sweep the cursor over the dial: a glow grows warmer near a hidden spot; hold still on it. Then the spot wanders: hold Space (or the left button) and keep the cursor on it while the rotation fills. |
+| Pin Tumbler Lock | Oblivion-style pins. Click a column to push its pin up; it pauses briefly at its own notch height, then drops. Click again during the pause to set it. Wrong-time clicks are errors; the first push reveals the notch. Higher tiers add pins, shorten the pause, cut the allowed errors and add fake pauses. |
+| Skill Check Lock | A needle sweeps the ring while the highlighted arc drifts the other way. Click or press Space inside the arc: yellow counts one, the thin blue caps count two. |
+| Tension Lock | Click the dial to start. Hold Space, the right mouse button, or the left button on the gauge to build tension; keep the marker in the moving green band and left-click the glowing targets before their ring runs out. The red cap burns the pick. |
+| Ward Trace Lock | Click S and trace the keyway to E without touching the walls. Ten pattern families (zigzag, wave, stairs, switchbacks, hairpins, orbits, petals, spirals, grid walks, grid mazes with safe dead ends); higher tiers are narrower, longer and fogged except near the cursor. |
 
-Fifteen difficulty tiers (Trivial to Legendary) scale every game: narrower zones, faster movement, more pins and targets, fewer spare picks.
+Every lock window shows a short "How to" text under the bars. Fifteen difficulty tiers (Trivial to Legendary) scale every game: narrower zones, faster movement, more pins and targets, shorter pauses, fewer allowed errors.
 
 ## What GMs get
 
@@ -26,7 +26,7 @@ Fifteen difficulty tiers (Trivial to Legendary) scale every game: narrower zones
 - **Container locks**: select a token, press the lock button in its HUD, set *Pickable* to Yes and press **Lock**. Locked Item Piles containers open their inventory automatically after a successful pick, and *Lock* / *Unlock* also lock or unlock the pile.
 - **Keys**: a character carrying an item named like the lock's key opens it without a minigame (optionally consuming the item).
 - **Tools**: list tool item names with a tier reduction in the settings (`Thieves' Tools=2; Masterwork Picks=4`). The best tool carried lowers the tier; tools can be required, and can break on failure.
-- **Skill**: an actor data path (default `system.skills.slt.total` on dnd5e) lowers the tier by `floor(value / divisor)`.
+- **Skill**: on dnd5e the character's points are Sleight of Hand total plus the thieves' tools proficiency bonus, doubled when proficient in both; the tier drops by `floor(points / divisor)` (divisor 2 by default). Other systems, or with the dnd5e formula switched off, use an actor data path such as `system.abilities.dex.mod`. This applies to every minigame, on top of the carried tool reduction.
 - **Attempts, cooldowns, jamming**: per-player attempt limits and failure cooldowns, globally or per lock. When attempts run out the lock can jam until the GM resets it from the lock settings.
 - **Macros**: name a macro to run on success or failure; it receives `actor`, `token`, `lockDocument`, `user`, `success`, `via` and `jammed`.
 - **Playground**: *Module Settings → Lockpick Minigames → Open the playground* runs any game at any tier with no lock. GMs can also Ctrl-click a locked door to try its minigame for real.

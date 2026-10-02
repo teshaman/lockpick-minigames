@@ -10,6 +10,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
 const sign = () => (Math.random() < 0.5 ? -1 : 1);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+/** Smallest angular distance between two angles in radians. */
+const angDist = (a, b) => { let d = ((a - b) % TAU + TAU) % TAU; return d > Math.PI ? TAU - d : d; };
 
 /** 0 for tier 1 … 1 for tier 15. */
 export const tierT = tier => (clamp(Number(tier) || 1, 1, TIERS) - 1) / (TIERS - 1);
@@ -126,13 +129,14 @@ export class MiniGame {
     this.host = host;
     this.health = 100;
     this.running = false;
-    this.mouse = { x: -1, y: -1, down: false };
+    this.mouse = { x: -1, y: -1, down: false, right: false };
     this.space = false;
     this.last = 0;
   }
 
   get W() { return this.canvas.width; }
   get H() { return this.canvas.height; }
+  /** Left button or Space. */
   get held() { return this.mouse.down || this.space; }
 
   start() {
@@ -171,6 +175,8 @@ export class MiniGame {
   onMove(x, y) {}
   onDown(x, y) {}
   onUp() {}
+  onRightDown(x, y) {}
+  onRightUp() {}
   onLeave() {}
   onSpace(down) {}
   onBroken() { this.fail(); }
@@ -224,13 +230,16 @@ export class MiniGame {
     this._h = {
       move: e => { const p = this.#pos(e); this.mouse.x = p.x; this.mouse.y = p.y; this.onMove(p.x, p.y); },
       down: e => {
-        if ( e.button !== 0 ) return;
         const p = this.#pos(e);
-        this.mouse.x = p.x; this.mouse.y = p.y; this.mouse.down = true;
+        this.mouse.x = p.x; this.mouse.y = p.y;
         try { c.setPointerCapture(e.pointerId); } catch(err) {}
-        this.onDown(p.x, p.y);
+        if ( e.button === 0 ) { this.mouse.down = true; this.onDown(p.x, p.y); }
+        else if ( e.button === 2 ) { this.mouse.right = true; this.onRightDown(p.x, p.y); }
       },
-      up: e => { if ( e.button !== 0 ) return; this.mouse.down = false; this.onUp(); },
+      up: e => {
+        if ( e.button === 0 ) { this.mouse.down = false; this.onUp(); }
+        else if ( e.button === 2 ) { this.mouse.right = false; this.onRightUp(); }
+      },
       leave: () => { this.onLeave(); },
       key: e => {
         if ( e.code !== "Space" ) return;
@@ -269,7 +278,7 @@ export class MiniGame {
 }
 
 /* ------------------------------------------------------------------ */
-/*  1. Sweet Spot — find the angle, hold to turn                       */
+/*  1. Sweet Spot — the pick circles the whole dial; hold to turn      */
 /* ------------------------------------------------------------------ */
 
 export class SweetSpotGame extends MiniGame {
@@ -280,144 +289,168 @@ export class SweetSpotGame extends MiniGame {
   setup() {
     this.cx = this.W / 2; this.cy = this.H / 2 + 6;
     this.r = Math.min(this.W, this.H) * 0.4;
-    this.sweet = rnd(-75, 75);
-    this.tol = lerp(14, 3.5, this.t);
-    this.soft = lerp(55, 22, this.t);
-    this.picks = this.tier <= 5 ? 3 : (this.tier <= 10 ? 2 : 1);
+    this.sweet = rnd(0, TAU);
+    this.tol = lerp(12, 2.5, this.t) * Math.PI / 180;
+    this.soft = lerp(45, 12, this.t) * Math.PI / 180;
+    this.turnSpeed = lerp(75, 50, this.t) * Math.PI / 180;
+    this.drain = lerp(45, 110, this.t);
     this.rot = 0;
-    this.pickAngle = 0;
+    this.maxRot = Math.PI / 2;
+    this.pickAngle = Math.PI / 2;
     this.stress = 0;
-  }
-
-  angleFromMouse() {
-    if ( this.mouse.x < 0 ) return this.pickAngle;
-    const a = Math.atan2(this.mouse.y - this.cy, this.mouse.x - this.cx) * 180 / Math.PI;
-    let p = a - 90;
-    if ( p > 180 ) p -= 360;
-    if ( p < -180 ) p += 360;
-    return clamp(p, -90, 90);
+    this.turning = false;
   }
 
   update(dt) {
-    if ( !this.held ) this.pickAngle = this.angleFromMouse();
-    const d = Math.abs(this.pickAngle - this.sweet);
-    const maxRot = 90 * (1 - clamp((d - this.tol) / this.soft, 0, 1));
+    if ( !this.held && this.mouse.x >= 0 ) this.pickAngle = Math.atan2(this.mouse.y - this.cy, this.mouse.x - this.cx);
+    const d = angDist(this.pickAngle, this.sweet);
+    const maxRot = (Math.PI / 2) * (1 - clamp((d - this.tol) / this.soft, 0, 1));
+    this.maxRot = maxRot;
     if ( this.held ) {
+      if ( !this.turning ) { this.turning = true; this.hint(""); }
       if ( this.rot < maxRot ) {
-        this.rot = Math.min(maxRot, this.rot + lerp(80, 55, this.t) * dt);
+        this.rot = Math.min(maxRot, this.rot + this.turnSpeed * dt);
         this.stress = Math.max(0, this.stress - dt * 2);
-      } else if ( maxRot < 90 ) {
-        this.stress = Math.min(1, this.stress + dt * 3);
-        this.damage(lerp(30, 70, this.t) * dt);
+      } else if ( maxRot < Math.PI / 2 ) {
+        this.stress = Math.min(1, this.stress + dt * 4);
+        this.damage(this.drain * dt);
       }
-      if ( this.rot >= 90 ) { this.rot = 90; this.win(); }
+      if ( this.rot >= Math.PI / 2 - 1e-3 ) { this.rot = Math.PI / 2; this.win(); }
     } else {
-      this.rot = Math.max(0, this.rot - 200 * dt);
+      if ( this.turning ) { this.turning = false; this.hint(this.constructor.hintKey); }
+      this.rot = Math.max(0, this.rot - 3.5 * dt);
       this.stress = Math.max(0, this.stress - dt * 3);
     }
-  }
-
-  onBroken() {
-    this.picks -= 1;
-    if ( this.picks <= 0 ) return this.fail();
-    this.health = 100;
-    this.mouse.down = false;
-    this.space = false;
-    this.rot = 0;
-    this.stress = 0;
-    this.hint("LPM.Hint.pickBroke", { n: this.picks });
-    setTimeout(() => { if ( this.running ) this.hint(this.constructor.hintKey); }, 1800);
   }
 
   draw() {
     const ctx = this.ctx;
     drawBackground(ctx, this.W, this.H, this.stress * 0.8);
-    const d = Math.abs(this.pickAngle - this.sweet);
-    drawDial(ctx, this.cx, this.cy, this.r, this.rot * Math.PI / 180, d <= this.tol ? 0.8 : 0);
-    const a = (this.pickAngle + 90 + this.rot) * Math.PI / 180;
-    const shake = this.stress > 0 ? (Math.random() - 0.5) * this.stress * 8 : 0;
+    const d = angDist(this.pickAngle, this.sweet);
+    drawDial(ctx, this.cx, this.cy, this.r, this.rot, d <= this.tol ? 0.7 : 0);
+    const a = this.pickAngle + this.rot;
+    const shake = this.stress > 0 ? (Math.random() - 0.5) * this.stress * 10 : 0;
     const len = this.r * 1.25;
+    const red = clamp(1 - this.health / 60, 0, 1);
     ctx.save();
     ctx.translate(this.cx, this.cy);
     ctx.rotate(a);
     ctx.translate(0, shake);
     const g = ctx.createLinearGradient(0, 0, len, 0);
-    g.addColorStop(0, "#f6f6fa");
-    g.addColorStop(1, this.stress > 0.3 ? "#ff6060" : "#8a8a96");
+    g.addColorStop(0, red > 0.3 ? "#ffd0d0" : "#f6f6fa");
+    g.addColorStop(1, red > 0.1 ? `rgb(255,${Math.round(120 - 90 * red)},${Math.round(120 - 90 * red)})` : "#8a8a96");
     ctx.lineCap = "round";
     ctx.lineWidth = 6; ctx.strokeStyle = "#15151c";
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(len, 0); ctx.stroke();
     ctx.lineWidth = 3; ctx.strokeStyle = g; ctx.stroke();
     ctx.restore();
-    for ( let i = 0; i < this.picks; i++ ) {
-      ctx.save();
-      ctx.translate(18 + i * 14, this.H - 18);
-      ctx.rotate(-Math.PI / 4);
-      ctx.lineCap = "round"; ctx.lineWidth = 2.5; ctx.strokeStyle = "#d9d9e0";
-      ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(7, 0); ctx.stroke();
-      ctx.restore();
-    }
   }
 
-  right() { return { value: this.rot / 90 }; }
+  right() { return { value: this.rot / (Math.PI / 2) }; }
 }
 
 /* ------------------------------------------------------------------ */
-/*  2. Dual Rotation — hold and chase the drifting glow                */
+/*  2. Dual Rotation — find the hidden spot (hot/cold), then track it  */
 /* ------------------------------------------------------------------ */
 
 export class DualRotationGame extends MiniGame {
   static id = "dual";
   static rightLabel = "LPM.Bar.Rotation";
-  static hintKey = "LPM.Hint.dual";
+  static hintKey = "LPM.Hint.dualSearch";
 
   setup() {
     this.cx = this.W / 2; this.cy = this.H / 2 + 6;
     this.r = Math.min(this.W, this.H) * 0.4;
-    this.theta = rnd(0, TAU);
-    this.rr = this.r * 0.5;
-    this.omega = lerp(0.7, 2.4, this.t) * sign();
-    this.flipIn = rnd(0.8, 2.2);
-    this.cap = lerp(60, 22, this.t);
+    this.bound = this.r * 0.64;
+    const a = rnd(0, TAU), d = rnd(0.2, 0.95) * this.bound;
+    this.sx = this.cx + Math.cos(a) * d; this.sy = this.cy + Math.sin(a) * d;
+    this.phase = "search";
+    this.searchRadius = lerp(150, 70, this.t);
+    this.captureFind = lerp(30, 12, this.t);
+    this.capture = lerp(48, 16, this.t);
+    this.speed = lerp(40, 150, this.t);
+    this.vx = 0; this.vy = 0;
+    this.turnIn = 0;
+    this.foundTimer = 0;
+    this.heat = 0;
     this.rot = 0;
     this.aligned = false;
-    this.sx = this.cx; this.sy = this.cy;
+    this.fillRate = lerp(40, 24, this.t) * Math.PI / 180;
+    this.drain = lerp(35, 85, this.t);
   }
 
   update(dt) {
-    this.flipIn -= dt;
-    if ( this.flipIn <= 0 ) {
-      this.omega *= -1;
-      this.flipIn = rnd(0.7, 2.2);
-      this.rr = this.r * rnd(0.3, 0.62);
+    const dist = this.mouse.x < 0 ? Infinity : Math.hypot(this.mouse.x - this.sx, this.mouse.y - this.sy);
+    if ( this.phase === "search" ) {
+      this.heat = clamp(1 - dist / this.searchRadius, 0, 1);
+      if ( dist <= this.captureFind ) {
+        this.foundTimer += dt;
+        if ( this.foundTimer >= 0.35 ) {
+          this.phase = "track";
+          const a = rnd(0, TAU);
+          this.vx = Math.cos(a) * this.speed; this.vy = Math.sin(a) * this.speed;
+          this.turnIn = rnd(0.4, 1.2);
+          this.hint("LPM.Hint.dualTrack");
+        }
+      } else this.foundTimer = 0;
+      return;
     }
-    this.theta += this.omega * dt;
-    this.sx = this.cx + Math.cos(this.theta) * this.rr;
-    this.sy = this.cy + Math.sin(this.theta) * this.rr;
-    const dist = Math.hypot(this.mouse.x - this.sx, this.mouse.y - this.sy);
-    this.aligned = this.mouse.x >= 0 && dist <= this.cap;
+    this.turnIn -= dt;
+    if ( this.turnIn <= 0 ) {
+      const a = Math.atan2(this.vy, this.vx) + rnd(-2.2, 2.2);
+      const s = this.speed * rnd(0.7, 1.3);
+      this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
+      this.turnIn = rnd(0.35, 1.1);
+    }
+    this.sx += this.vx * dt; this.sy += this.vy * dt;
+    const dx = this.sx - this.cx, dy = this.sy - this.cy;
+    const dd = Math.hypot(dx, dy);
+    if ( dd > this.bound ) {
+      const nx = dx / dd, ny = dy / dd;
+      const dot = this.vx * nx + this.vy * ny;
+      this.vx -= 2 * dot * nx; this.vy -= 2 * dot * ny;
+      this.sx = this.cx + nx * this.bound; this.sy = this.cy + ny * this.bound;
+    }
+    this.aligned = dist <= this.capture;
     if ( this.held ) {
       if ( this.aligned ) {
-        this.rot = Math.min(90, this.rot + lerp(45, 30, this.t) * dt);
-        if ( this.rot >= 90 ) return this.win();
+        this.rot = Math.min(Math.PI / 2, this.rot + this.fillRate * dt);
+        if ( this.rot >= Math.PI / 2 - 1e-3 ) return this.win();
       } else {
-        this.damage(lerp(28, 60, this.t) * dt);
+        this.damage(this.drain * dt);
       }
     } else {
-      this.rot = Math.max(0, this.rot - 20 * dt);
+      this.rot = Math.max(0, this.rot - 0.45 * dt);
     }
   }
 
   draw() {
     const ctx = this.ctx;
-    drawBackground(ctx, this.W, this.H, this.held && !this.aligned ? 0.7 : 0);
-    drawDial(ctx, this.cx, this.cy, this.r, this.rot * Math.PI / 180, 0);
-    const g = ctx.createRadialGradient(this.sx, this.sy, 0, this.sx, this.sy, this.cap * 1.4);
+    drawBackground(ctx, this.W, this.H, this.phase === "track" && this.held && !this.aligned ? 0.7 : 0);
+    drawDial(ctx, this.cx, this.cy, this.r, this.rot, 0);
+    if ( this.phase === "search" ) {
+      if ( this.mouse.x >= 0 && this.heat > 0 ) {
+        const rad = 30 + 90 * this.heat;
+        const g = ctx.createRadialGradient(this.mouse.x, this.mouse.y, 0, this.mouse.x, this.mouse.y, rad);
+        g.addColorStop(0, `rgba(255,236,160,${0.15 + 0.75 * this.heat})`);
+        g.addColorStop(1, "rgba(255,214,90,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(this.mouse.x, this.mouse.y, rad, 0, TAU); ctx.fill();
+      }
+      if ( this.foundTimer > 0 ) {
+        ctx.strokeStyle = "#9fd4ff"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(this.sx, this.sy, 6 + 10 * (1 - this.foundTimer / 0.35), 0, TAU); ctx.stroke();
+      }
+      return;
+    }
+    const g = ctx.createRadialGradient(this.sx, this.sy, 0, this.sx, this.sy, this.capture * 1.6);
     g.addColorStop(0, "rgba(255,244,180,0.95)");
-    g.addColorStop(0.35, "rgba(255,214,90,0.5)");
+    g.addColorStop(0.3, "rgba(255,214,90,0.5)");
     g.addColorStop(1, "rgba(255,214,90,0)");
     ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(this.sx, this.sy, this.cap * 1.4, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(this.sx, this.sy, this.capture * 1.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#ffe066";
+    ctx.beginPath(); ctx.arc(this.sx, this.sy, 6, 0, TAU); ctx.fill();
     if ( this.mouse.x >= 0 ) {
       ctx.lineWidth = 2;
       ctx.strokeStyle = this.aligned ? PALETTE.green : "rgba(255,255,255,0.55)";
@@ -425,11 +458,11 @@ export class DualRotationGame extends MiniGame {
     }
   }
 
-  right() { return { value: this.rot / 90 }; }
+  right() { return { value: this.rot / (Math.PI / 2) }; }
 }
 
 /* ------------------------------------------------------------------ */
-/*  3. Pin Tumbler — click each pin at the top of its bounce           */
+/*  3. Pin Tumbler — push a pin, catch it while it pauses at its notch */
 /* ------------------------------------------------------------------ */
 
 export class PinTumblerGame extends MiniGame {
@@ -438,18 +471,30 @@ export class PinTumblerGame extends MiniGame {
   static hintKey = "LPM.Hint.tumbler";
 
   setup() {
-    this.n = Math.round(lerp(3, 7, this.t));
-    this.errorsAllowed = Math.max(1, Math.round(lerp(6, 2, this.t)));
+    this.n = Math.round(lerp(4, 8, this.t));
+    this.errorsAllowed = Math.max(1, Math.round(lerp(6, 1, this.t)));
     this.errors = 0;
-    this.window = lerp(0.22, 0.07, this.t);
+    this.riseSpeed = lerp(1.1, 2.6, this.t);
+    this.fallSpeed = 3.2;
+    this.pause = lerp(0.7, 0.18, this.t);
+    const fakes = this.t > 0.55 ? Math.round(lerp(1, 3, (this.t - 0.55) / 0.45)) : 0;
     this.pins = Array.from({ length: this.n }, () => ({
-      phase: rnd(0, TAU),
-      period: lerp(2.1, 0.9, this.t) * rnd(0.85, 1.15),
+      notch: rnd(0.35, 0.95),
+      fake: null,
+      state: "idle",
+      pos: 0,
+      pauseT: 0,
+      known: false,
       set: false,
-      flash: 0
+      flash: 0,
+      passedFake: false,
+      passedNotch: false
     }));
-    this.time = 0;
-    this.frameW = Math.min(this.W - 80, this.n * 58 + 40);
+    for ( const p of this.pins.slice().sort(() => Math.random() - 0.5).slice(0, fakes) ) {
+      p.fake = Math.random() < 0.5 ? rnd(0.12, p.notch - 0.15) : rnd(p.notch + 0.12, 0.98);
+      if ( p.fake < 0.1 || p.fake > 0.99 ) p.fake = null;
+    }
+    this.frameW = Math.min(this.W - 60, this.n * 56 + 30);
     this.x0 = (this.W - this.frameW) / 2;
     this.colW = this.frameW / this.n;
     this.top = 78;
@@ -459,16 +504,33 @@ export class PinTumblerGame extends MiniGame {
     this.travel = this.bottom - this.base - this.top - this.pinH - 10;
   }
 
-  pos(i) {
-    const p = this.pins[i];
-    return p.set ? 1 : 0.5 + 0.5 * Math.sin(TAU * this.time / p.period + p.phase);
-  }
-
   update(dt) {
-    this.time += dt;
     for ( const p of this.pins ) {
       if ( p.flash > 0 ) p.flash = Math.max(0, p.flash - dt * 3);
       else if ( p.flash < 0 ) p.flash = Math.min(0, p.flash + dt * 3);
+      if ( p.set ) continue;
+      switch ( p.state ) {
+        case "rise": {
+          const next = p.pos + this.riseSpeed * dt;
+          if ( p.fake !== null && !p.passedFake && p.pos < p.fake && next >= p.fake ) {
+            p.pos = p.fake; p.passedFake = true; p.state = "fakepause"; p.pauseT = this.pause * 0.45;
+          } else if ( !p.passedNotch && p.pos < p.notch && next >= p.notch ) {
+            p.pos = p.notch; p.passedNotch = true; p.known = true; p.state = "pause"; p.pauseT = this.pause;
+          } else if ( next >= 1 ) {
+            p.pos = 1; p.state = "fall";
+          } else p.pos = next;
+          break;
+        }
+        case "pause":
+        case "fakepause":
+          p.pauseT -= dt;
+          if ( p.pauseT <= 0 ) p.state = p.state === "pause" ? "fall" : "rise";
+          break;
+        case "fall":
+          p.pos -= this.fallSpeed * dt;
+          if ( p.pos <= 0 ) { p.pos = 0; p.state = "idle"; p.passedFake = false; p.passedNotch = false; }
+          break;
+      }
     }
   }
 
@@ -477,15 +539,22 @@ export class PinTumblerGame extends MiniGame {
     if ( i < 0 || i >= this.n ) return;
     const p = this.pins[i];
     if ( p.set ) return;
-    if ( this.pos(i) >= 1 - this.window ) {
+    if ( p.state === "idle" ) {
+      p.state = "rise";
+      p.passedFake = false; p.passedNotch = false;
+      return;
+    }
+    if ( p.state === "pause" ) {
       p.set = true;
+      p.pos = p.notch;
       p.flash = 1;
       if ( this.pins.every(q => q.set) ) this.win();
-    } else {
-      this.errors += 1;
-      p.flash = -1;
-      this.damage(100 / this.errorsAllowed + 0.01);
+      return;
     }
+    this.errors += 1;
+    p.flash = -1;
+    p.state = "fall";
+    this.damage(100 / this.errorsAllowed + 0.01);
   }
 
   draw() {
@@ -501,18 +570,19 @@ export class PinTumblerGame extends MiniGame {
     const baseY = this.bottom - this.base;
     ctx.fillStyle = "#b8912f";
     ctx.fillRect(this.x0 - 12, baseY, this.frameW + 24, this.base + 12);
-    const lineY = baseY - this.pinH - this.travel * (1 - this.window) - 4;
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = "rgba(216,178,74,0.6)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(this.x0 - 6, lineY); ctx.lineTo(this.x0 + this.frameW + 6, lineY); ctx.stroke();
-    ctx.setLineDash([]);
     for ( let i = 0; i < this.n; i++ ) {
       const p = this.pins[i];
       const cx = this.x0 + this.colW * (i + 0.5);
       const gw = Math.min(26, this.colW * 0.5);
       ctx.fillStyle = "#0d0c16";
       ctx.fillRect(cx - gw / 2, this.top, gw, baseY - this.top);
-      const y = baseY - this.pinH - this.pos(i) * this.travel;
+      const y = baseY - this.pinH - p.pos * this.travel;
+      if ( p.known || p.set ) {
+        const ny = baseY - this.pinH - p.notch * this.travel;
+        ctx.fillStyle = p.set ? "rgba(216,178,74,0.9)" : "rgba(216,178,74,0.55)";
+        ctx.fillRect(cx - gw / 2 - 6, ny - 1.5, 6, 3);
+        ctx.fillRect(cx + gw / 2, ny - 1.5, 6, 3);
+      }
       ctx.strokeStyle = "#6d6a7a"; ctx.lineWidth = 1.5;
       ctx.beginPath();
       let yy = this.top + 4;
@@ -529,6 +599,9 @@ export class PinTumblerGame extends MiniGame {
       const g = ctx.createLinearGradient(0, y, 0, y + this.pinH);
       if ( p.set ) {
         g.addColorStop(0, "#f2d87c"); g.addColorStop(1, "#8a6d2a");
+      } else if ( p.state === "pause" || p.state === "fakepause" ) {
+        g.addColorStop(0, "#ffffff"); g.addColorStop(0.5, "#c9c9d6");
+        g.addColorStop(0.5, "#9fd4ff"); g.addColorStop(1, "#4a8fd6");
       } else {
         g.addColorStop(0, "#e9e9f0"); g.addColorStop(0.5, "#9a9aa6");
         g.addColorStop(0.5, "#6fb6ff"); g.addColorStop(1, "#2e6fb5");
@@ -545,6 +618,10 @@ export class PinTumblerGame extends MiniGame {
       ctx.beginPath();
       ctx.moveTo(cx - 5, baseY + 8); ctx.lineTo(cx + 5, baseY + 8); ctx.lineTo(cx, baseY + 16);
       ctx.closePath(); ctx.fill();
+      if ( p.state === "idle" && !p.set ) {
+        ctx.fillStyle = "rgba(216,178,74,0.5)";
+        ctx.beginPath(); ctx.moveTo(cx - 4, baseY + 20); ctx.lineTo(cx + 4, baseY + 20); ctx.lineTo(cx, baseY + 14); ctx.closePath(); ctx.fill();
+      }
     }
   }
 
@@ -555,7 +632,7 @@ export class PinTumblerGame extends MiniGame {
 }
 
 /* ------------------------------------------------------------------ */
-/*  4. Skill Check — click when the sweep hits the highlighted zone    */
+/*  4. Skill Check — click when the sweep hits the drifting arc        */
 /* ------------------------------------------------------------------ */
 
 export class SkillCheckGame extends MiniGame {
@@ -567,31 +644,33 @@ export class SkillCheckGame extends MiniGame {
     this.cx = this.W / 2; this.cy = this.H / 2 + 10;
     this.R = Math.min(this.W, this.H) * 0.36;
     this.width = 34;
-    this.need = Math.round(lerp(3, 6, this.t));
+    this.need = Math.round(lerp(3, 7, this.t));
     this.hits = 0;
     this.a = rnd(0, TAU);
-    this.omega = lerp(1.7, 5.0, this.t) * sign();
-    this.zoneW = lerp(1.25, 0.32, this.t);
-    this.missDmg = lerp(34, 51, this.t);
+    this.omega = lerp(2.0, 6.0, this.t) * sign();
+    this.zoneW = lerp(1.1, 0.28, this.t);
+    this.capW = this.zoneW * 0.22;
+    this.drift = lerp(0.1, 1.1, this.t);
+    this.missDmg = lerp(40, 60, this.t);
     this.flash = 0;
     this.newZone();
   }
 
   newZone() {
-    const ahead = rnd(0.9, 3.5) * Math.sign(this.omega);
+    const ahead = rnd(1.2, 4.0) * Math.sign(this.omega);
     this.zone = (this.a + ahead + TAU) % TAU;
   }
 
+  /** 0 = miss, 1 = yellow body, 2 = blue cap. */
   inZone() {
-    let d = ((this.a - this.zone) % TAU + TAU) % TAU;
-    if ( d > Math.PI ) d -= TAU;
-    const ad = Math.abs(d);
-    if ( ad > this.zoneW / 2 ) return 0;
-    return ad <= this.zoneW / 6 ? 2 : 1;
+    const d = angDist(this.a, this.zone);
+    if ( d > this.zoneW / 2 ) return 0;
+    return d >= this.zoneW / 2 - this.capW ? 2 : 1;
   }
 
   update(dt) {
     this.a = (this.a + this.omega * dt + TAU) % TAU;
+    this.zone = (this.zone - Math.sign(this.omega) * this.drift * dt + TAU) % TAU;
     if ( this.flash > 0 ) this.flash = Math.max(0, this.flash - dt * 3);
     else if ( this.flash < 0 ) this.flash = Math.min(0, this.flash + dt * 3);
   }
@@ -603,7 +682,7 @@ export class SkillCheckGame extends MiniGame {
       this.hits = Math.min(this.need, this.hits + z);
       this.flash = 1;
       if ( this.hits >= this.need ) return this.win();
-      this.omega *= lerp(1.0, 1.08, this.t) * (Math.random() < 0.3 ? -1 : 1);
+      this.omega *= lerp(1.02, 1.12, this.t) * (Math.random() < lerp(0.2, 0.45, this.t) ? -1 : 1);
       this.newZone();
     } else {
       this.flash = -1;
@@ -629,11 +708,13 @@ export class SkillCheckGame extends MiniGame {
       ctx.lineTo(this.cx + Math.cos(a) * (this.R + this.width / 2), this.cy + Math.sin(a) * (this.R + this.width / 2));
       ctx.stroke();
     }
+    const z0 = this.zone - this.zoneW / 2, z1 = this.zone + this.zoneW / 2;
     ctx.lineWidth = this.width - 4;
     ctx.strokeStyle = this.flash > 0 ? "#8fe08f" : "#e4c04a";
-    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.R, this.zone - this.zoneW / 2, this.zone + this.zoneW / 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.R, z0, z1); ctx.stroke();
     ctx.strokeStyle = this.flash > 0 ? "#bdf3bd" : "#6fb6ff";
-    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.R, this.zone - this.zoneW / 6, this.zone + this.zoneW / 6); ctx.stroke();
+    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.R, z0, z0 + this.capW); ctx.stroke();
+    ctx.beginPath(); ctx.arc(this.cx, this.cy, this.R, z1 - this.capW, z1); ctx.stroke();
     drawDial(ctx, this.cx, this.cy, this.R * 0.42, 0, 0);
     const nx = this.cx + Math.cos(this.a) * (this.R + this.width / 2 + 8);
     const ny = this.cy + Math.sin(this.a) * (this.R + this.width / 2 + 8);
@@ -651,7 +732,7 @@ export class SkillCheckGame extends MiniGame {
 }
 
 /* ------------------------------------------------------------------ */
-/*  5. Tension — hold Space in the safe band, click the targets        */
+/*  5. Tension — keep the marker in the moving band, click targets     */
 /* ------------------------------------------------------------------ */
 
 export class TensionGame extends MiniGame {
@@ -662,28 +743,37 @@ export class TensionGame extends MiniGame {
   setup() {
     this.started = false;
     this.tension = 0;
-    this.rise = lerp(0.9, 1.4, this.t);
-    this.fall = lerp(0.6, 1.0, this.t);
-    this.bandHalf = lerp(0.17, 0.06, this.t);
-    this.bandC = rnd(0.3, 0.7);
-    this.bandV = lerp(0.04, 0.18, this.t) * sign();
-    this.need = Math.round(lerp(4, 8, this.t));
+    this.rise = lerp(0.9, 1.6, this.t);
+    this.fall = lerp(0.7, 1.3, this.t);
+    this.bandHalf = lerp(0.15, 0.045, this.t);
+    this.bandC = rnd(0.35, 0.65);
+    this.bandV = lerp(0.05, 0.28, this.t) * sign();
+    this.need = Math.round(lerp(4, 9, this.t));
     this.count = 0;
     this.gx = 56; this.gw = 34; this.gTop = 50; this.gBot = this.H - 44;
     this.cx = this.W / 2 + 36; this.cy = this.H / 2 + 8;
     this.r = Math.min(this.W, this.H) * 0.36;
     this.target = null;
+    this.ttl = lerp(3.5, 1.6, this.t);
     this.targetTTL = 0;
-    this.missDmg = lerp(25, 40, this.t);
+    this.missDmg = lerp(30, 45, this.t);
+    this.expireDmg = lerp(0, 25, this.t);
+    this.gaugeHeld = false;
     this.flash = 0;
     this.pulse = 0;
   }
 
+  get pressing() { return this.space || this.mouse.right || this.gaugeHeld; }
+
+  inGauge(x, y) {
+    return x >= this.gx - 14 && x <= this.gx + this.gw + 14 && y >= this.gTop - 12 && y <= this.gBot + 12;
+  }
+
   newTarget() {
     const a = rnd(0, TAU);
-    const d = rnd(0.15, 0.8) * this.r;
+    const d = rnd(0.15, 0.82) * this.r;
     this.target = { x: this.cx + Math.cos(a) * d, y: this.cy + Math.sin(a) * d };
-    this.targetTTL = lerp(4, 2, this.t);
+    this.targetTTL = this.ttl;
   }
 
   inBand() { return Math.abs(this.tension - this.bandC) <= this.bandHalf; }
@@ -693,18 +783,22 @@ export class TensionGame extends MiniGame {
     if ( this.flash > 0 ) this.flash = Math.max(0, this.flash - dt * 3);
     else if ( this.flash < 0 ) this.flash = Math.min(0, this.flash + dt * 3);
     if ( !this.started ) return;
-    this.tension = clamp(this.tension + (this.space ? this.rise : -this.fall) * dt, 0, 1);
+    this.tension = clamp(this.tension + (this.pressing ? this.rise : -this.fall) * dt, 0, 1);
     this.bandC += this.bandV * dt;
     const lo = 0.12 + this.bandHalf, hi = 0.86 - this.bandHalf;
     if ( this.bandC < lo ) { this.bandC = lo; this.bandV = Math.abs(this.bandV); }
     if ( this.bandC > hi ) { this.bandC = hi; this.bandV = -Math.abs(this.bandV); }
-    if ( Math.random() < dt * 0.4 ) this.bandV *= -1;
-    if ( this.tension >= 0.95 ) this.damage(40 * dt);
+    if ( Math.random() < dt * lerp(0.3, 0.9, this.t) ) this.bandV *= -1;
+    if ( this.tension >= 0.95 ) this.damage(50 * dt);
     this.targetTTL -= dt;
-    if ( this.targetTTL <= 0 ) this.newTarget();
+    if ( this.targetTTL <= 0 ) {
+      if ( this.expireDmg > 0 ) { this.flash = -1; this.damage(this.expireDmg); }
+      if ( this.running ) this.newTarget();
+    }
   }
 
   onDown(x, y) {
+    if ( this.inGauge(x, y) ) { this.gaugeHeld = true; if ( this.started ) return; }
     if ( !this.started ) {
       this.started = true;
       this.newTarget();
@@ -725,20 +819,28 @@ export class TensionGame extends MiniGame {
     }
   }
 
+  onUp() { this.gaugeHeld = false; }
+  onLeave() { this.gaugeHeld = false; }
+
   draw() {
     const ctx = this.ctx;
     drawBackground(ctx, this.W, this.H, this.tension >= 0.95 ? 0.8 : (this.flash < 0 ? -this.flash : 0));
     const gh = this.gBot - this.gTop;
     ctx.fillStyle = "#15141f";
     roundRect(ctx, this.gx, this.gTop, this.gw, gh, 6); ctx.fill();
-    ctx.strokeStyle = "#8a6d2a"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = this.pressing ? "#d8b24a" : "#8a6d2a"; ctx.lineWidth = 2; ctx.stroke();
     const bandTop = this.gBot - (this.bandC + this.bandHalf) * gh;
     ctx.fillStyle = "rgba(90,211,90,0.28)";
     ctx.fillRect(this.gx + 2, bandTop, this.gw - 4, this.bandHalf * 2 * gh);
+    ctx.strokeStyle = "rgba(90,211,90,0.7)"; ctx.lineWidth = 1;
+    ctx.strokeRect(this.gx + 2, bandTop, this.gw - 4, this.bandHalf * 2 * gh);
     const fillH = this.tension * gh;
     const inBand = this.inBand();
-    ctx.fillStyle = this.tension >= 0.95 ? PALETTE.red : (inBand ? PALETTE.green : "#7f9a70");
+    ctx.fillStyle = this.tension >= 0.95 ? "rgba(255,75,75,0.5)" : (inBand ? "rgba(90,211,90,0.45)" : "rgba(127,154,112,0.35)");
     ctx.fillRect(this.gx + 4, this.gBot - fillH, this.gw - 8, fillH);
+    const my = this.gBot - fillH;
+    ctx.fillStyle = this.tension >= 0.95 ? PALETTE.red : (inBand ? PALETTE.green : "#c9c2a8");
+    roundRect(ctx, this.gx - 4, my - 3, this.gw + 8, 6, 3); ctx.fill();
     ctx.fillStyle = "rgba(255,60,60,0.85)";
     roundRect(ctx, this.gx, this.gTop - 4, this.gw, 10, 4); ctx.fill();
     ctx.save();
@@ -759,6 +861,8 @@ export class TensionGame extends MiniGame {
     }
     if ( !this.started ) {
       label(ctx, game.i18n.localize("LPM.Tension.Start"), this.cx, this.cy, { size: 16, bold: true, color: PALETTE.gold });
+      ctx.strokeStyle = "rgba(216,178,74,0.6)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(this.cx, this.cy, 22 + Math.sin(this.pulse * 4) * 3, 0, TAU); ctx.stroke();
     } else if ( this.target ) {
       const pr = 7 + Math.sin(this.pulse * 6) * 1.5;
       const g = ctx.createRadialGradient(this.target.x, this.target.y, 0, this.target.x, this.target.y, 30);
@@ -766,6 +870,8 @@ export class TensionGame extends MiniGame {
       g.addColorStop(1, "rgba(255,230,120,0)");
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(this.target.x, this.target.y, 30, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "rgba(255,230,120,0.7)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(this.target.x, this.target.y, 18, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(this.targetTTL / this.ttl, 0, 1)); ctx.stroke();
       ctx.fillStyle = inBand ? "#ffe066" : "#b89a3a";
       ctx.beginPath(); ctx.arc(this.target.x, this.target.y, pr, 0, TAU); ctx.fill();
       ctx.strokeStyle = "#120d06"; ctx.lineWidth = 1.5; ctx.stroke();
@@ -776,8 +882,214 @@ export class TensionGame extends MiniGame {
 }
 
 /* ------------------------------------------------------------------ */
-/*  6. Ward Trace — guide the cursor along the keyway                  */
+/*  6. Ward Trace — guide the cursor along a different keyway each time */
 /* ------------------------------------------------------------------ */
+
+/** Collapse runs of collinear points. */
+function simplify(pts) {
+  const out = [pts[0]];
+  for ( let i = 1; i < pts.length - 1; i++ ) {
+    const a = out[out.length - 1], b = pts[i], c = pts[i + 1];
+    if ( Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) > 0.5 ) out.push(b);
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+/**
+ * Keyway generators. Each returns either an array of points (the safe path, S at the
+ * first point, E at the last) or {pts, extra} where extra is a list of [a, b] segments
+ * that are also safe corridors but give no progress (maze dead ends).
+ */
+export const KEYWAYS = {
+  zigzag(W, H, t) {
+    const k = Math.round(lerp(5, 13, t));
+    const pts = [];
+    for ( let i = 0; i <= k; i++ ) {
+      const x = 60 + (W - 120) * i / k;
+      const y = (i === 0 || i === k) ? H / 2 : (i % 2 ? rnd(55, H / 2 - 25) : rnd(H / 2 + 25, H - 55));
+      pts.push({ x, y });
+    }
+    return pts;
+  },
+  wave(W, H, t) {
+    const f1 = rnd(1.5, 2.5 + 2.5 * t), f2 = rnd(4, 7 + 4 * t);
+    const a1 = rnd(70, 110), a2 = lerp(10, 45, t);
+    const p1 = rnd(0, TAU), p2 = rnd(0, TAU);
+    const pts = [];
+    const n = 60;
+    for ( let i = 0; i <= n; i++ ) {
+      const u = i / n;
+      const x = 60 + (W - 120) * u;
+      const env = Math.sin(u * Math.PI);
+      pts.push({ x, y: H / 2 + env * (a1 * Math.sin(f1 * u * TAU / 2 + p1) + a2 * Math.sin(f2 * u * TAU / 2 + p2)) });
+    }
+    return pts;
+  },
+  stairs(W, H, t) {
+    const pts = [{ x: 50, y: rnd(H * 0.35, H * 0.65) }];
+    let x = 50, y = pts[0].y;
+    while ( x < W - 60 ) {
+      x = Math.min(W - 50, x + rnd(lerp(70, 35, t), lerp(110, 60, t)));
+      pts.push({ x, y });
+      if ( x >= W - 50 ) break;
+      const dir = y > H / 2 ? -1 : 1;
+      y = clamp(y + dir * rnd(lerp(40, 60, t), lerp(90, 130, t)), 50, H - 50);
+      pts.push({ x, y });
+    }
+    return pts;
+  },
+  serpentine(W, H, t, halfW) {
+    const rows = Math.round(lerp(3, 6, t));
+    const gap = Math.max(halfW * 3 + 8, (H - 100) / rows);
+    const y0 = H / 2 - gap * (rows - 1) / 2;
+    const pts = [];
+    for ( let r = 0; r < rows; r++ ) {
+      const y = y0 + r * gap;
+      const left = { x: 50, y }, right = { x: W - 50, y };
+      pts.push(r % 2 ? right : left, r % 2 ? left : right);
+    }
+    return pts;
+  },
+  hairpins(W, H, t, halfW) {
+    const cols = Math.round(lerp(4, 8, t));
+    const gap = Math.max(halfW * 3 + 8, (W - 120) / cols);
+    const x0 = W / 2 - gap * (cols - 1) / 2;
+    const pts = [];
+    const flip = Math.random() < 0.5;
+    for ( let c = 0; c < cols; c++ ) {
+      const x = x0 + c * gap;
+      const top = { x, y: 50 }, bottom = { x, y: H - 50 };
+      const down = (c % 2 === 0) !== flip;
+      pts.push(down ? top : bottom, down ? bottom : top);
+    }
+    return pts;
+  },
+  orbit(W, H, t, halfW) {
+    const cx = W / 2, cy = H / 2;
+    const gap = Math.max(halfW * 3 + 8, lerp(95, 40, t));
+    const Rmax = Math.min(W, H) / 2 - 30;
+    const levels = Math.max(2, Math.floor((Rmax - 40) / gap) + 1);
+    const radii = Array.from({ length: levels }, (_, i) => Rmax - i * gap);
+    const pts = [];
+    let a = rnd(0, TAU);
+    const dir = sign();
+    const hops = Math.round(lerp(3, 7, t));
+    let level = Math.floor(Math.random() * levels);
+    for ( let h = 0; h < hops; h++ ) {
+      const sweep = rnd(0.6, 1.6);
+      const steps = Math.ceil(sweep / 0.12);
+      for ( let i = (h === 0 ? 0 : 1); i <= steps; i++ ) {
+        const ang = a + dir * sweep * i / steps;
+        pts.push({ x: cx + Math.cos(ang) * radii[level], y: cy + Math.sin(ang) * radii[level] });
+      }
+      a += dir * sweep;
+      const next = clamp(level + pick([-1, 1]), 0, levels - 1);
+      if ( next !== level && h < hops - 1 ) {
+        level = next;
+        pts.push({ x: cx + Math.cos(a) * radii[level], y: cy + Math.sin(a) * radii[level] });
+      }
+    }
+    return pts;
+  },
+  petal(W, H, t) {
+    const cx = W / 2, cy = H / 2;
+    const R = Math.min(W, H) / 2 - 36;
+    const k = Math.round(lerp(3, 6, t));
+    const amp = lerp(0.18, 0.28, t);
+    const a0 = rnd(0, TAU);
+    const pts = [];
+    const n = 90;
+    for ( let i = 0; i <= n; i++ ) {
+      const th = 0.2 + (TAU - 0.4) * i / n;
+      const r = R * (0.72 + amp * Math.sin(k * th));
+      pts.push({ x: cx + Math.cos(a0 + th) * r, y: cy + Math.sin(a0 + th) * r });
+    }
+    return pts;
+  },
+  spiral(W, H, t, halfW) {
+    const cx = W / 2, cy = H / 2;
+    const step = Math.max(halfW * 3 + 10, lerp(46, 34, t));
+    const turns = Math.round(lerp(1.5, 2.5, t) * 4);
+    let w = Math.min(W, H) - 60, h = w;
+    const pts = [{ x: cx - w / 2, y: cy + h / 2 }];
+    let x = cx - w / 2, y = cy + h / 2;
+    const dirs = [[1, 0], [0, -1], [-1, 0], [0, 1]];
+    let len = w;
+    for ( let i = 0; i < turns; i++ ) {
+      const [dx, dy] = dirs[i % 4];
+      x += dx * len; y += dy * len;
+      pts.push({ x, y });
+      if ( i % 2 === 1 ) len -= step;
+      if ( len < step ) break;
+    }
+    return pts;
+  },
+  walk(W, H, t, halfW) {
+    const cell = Math.max(halfW * 3 + 8, lerp(60, 44, t));
+    const cols = Math.floor((W - 100) / cell), rows = Math.floor((H - 80) / cell);
+    const x0 = (W - cols * cell) / 2, y0 = (H - rows * cell) / 2;
+    let c = 0, r = Math.floor(rows / 2);
+    const pts = [{ x: x0 + c * cell, y: y0 + r * cell }];
+    let lastV = 0;
+    while ( c < cols ) {
+      const v = Math.random() < lerp(0.45, 0.7, t) ? pick([-1, 1]) : 0;
+      if ( v !== 0 && v !== -lastV ) {
+        const run = Math.round(rnd(1, Math.max(1, rows / 2)));
+        const nr = clamp(r + v * run, 0, rows);
+        if ( nr !== r ) { r = nr; pts.push({ x: x0 + c * cell, y: y0 + r * cell }); lastV = v; }
+      } else lastV = 0;
+      c += 1;
+      pts.push({ x: x0 + c * cell, y: y0 + r * cell });
+    }
+    return pts;
+  },
+  maze(W, H, t, halfW) {
+    const cell = Math.max(halfW * 3 + 8, lerp(66, 44, t));
+    const cols = Math.max(3, Math.floor((W - 70) / cell)), rows = Math.max(2, Math.floor((H - 60) / cell));
+    const x0 = (W - (cols - 1) * cell) / 2, y0 = (H - (rows - 1) * cell) / 2;
+    const key = (c, r) => r * cols + c;
+    const N = cols * rows;
+    const adj = Array.from({ length: N }, () => []);
+    const seen = new Uint8Array(N);
+    const startRow = Math.floor(Math.random() * rows);
+    const stack = [[0, startRow]];
+    seen[key(0, startRow)] = 1;
+    while ( stack.length ) {
+      const [c, r] = stack[stack.length - 1];
+      const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [c + dx, r + dy])
+        .filter(([nc, nr]) => nc >= 0 && nc < cols && nr >= 0 && nr < rows && !seen[key(nc, nr)]);
+      if ( !nb.length ) { stack.pop(); continue; }
+      const [nc, nr] = pick(nb);
+      seen[key(nc, nr)] = 1;
+      adj[key(c, r)].push(key(nc, nr));
+      adj[key(nc, nr)].push(key(c, r));
+      stack.push([nc, nr]);
+    }
+    const startK = key(0, startRow);
+    const dist = new Int32Array(N).fill(-1), prev = new Int32Array(N).fill(-1);
+    const q = [startK]; dist[startK] = 0;
+    while ( q.length ) {
+      const u = q.shift();
+      for ( const v of adj[u] ) if ( dist[v] < 0 ) { dist[v] = dist[u] + 1; prev[v] = u; q.push(v); }
+    }
+    let endK = -1;
+    for ( let r = 0; r < rows; r++ ) { const k = key(cols - 1, r); if ( endK < 0 || dist[k] > dist[endK] ) endK = k; }
+    const cells = [];
+    for ( let u = endK; u !== -1; u = prev[u] ) cells.push(u);
+    cells.reverse();
+    const P = k => ({ x: x0 + (k % cols) * cell, y: y0 + Math.floor(k / cols) * cell });
+    const onPath = new Uint8Array(N);
+    for ( const k of cells ) onPath[k] = 1;
+    const extra = [];
+    for ( let u = 0; u < N; u++ ) for ( const v of adj[u] ) {
+      if ( v < u ) continue;
+      if ( onPath[u] && onPath[v] && Math.abs(cells.indexOf(u) - cells.indexOf(v)) === 1 ) continue;
+      extra.push([P(u), P(v)]);
+    }
+    return { pts: simplify(cells.map(P)), extra };
+  }
+};
 
 export class WardTraceGame extends MiniGame {
   static id = "trace";
@@ -785,17 +1097,22 @@ export class WardTraceGame extends MiniGame {
   static hintKey = "LPM.Hint.trace";
 
   setup() {
-    const k = Math.round(lerp(5, 10, this.t));
-    this.halfW = lerp(28, 12, this.t);
-    const x0 = 60, x1 = this.W - 60;
-    this.pts = [];
-    for ( let i = 0; i <= k; i++ ) {
-      const x = x0 + (x1 - x0) * i / k;
-      let y;
-      if ( i === 0 || i === k ) y = this.H / 2;
-      else y = i % 2 ? rnd(60, this.H / 2 - 30) : rnd(this.H / 2 + 30, this.H - 60);
-      this.pts.push({ x, y });
-    }
+    this.halfW = lerp(30, 9, this.t);
+    const names = this.t < 0.2 ? ["zigzag", "wave", "stairs"]
+      : (this.t < 0.5 ? ["zigzag", "wave", "stairs", "serpentine", "hairpins", "walk", "orbit"] : Object.keys(KEYWAYS));
+    this.kind = pick(names);
+    this.build(this.kind);
+    this.fog = this.t > 0.5 ? lerp(230, 80, (this.t - 0.5) * 2) : 0;
+    this.state = "idle";
+    this.progress = 0;
+    this.hitDmg = lerp(40, 100, this.t);
+    this.flash = 0;
+  }
+
+  build(kind) {
+    const made = KEYWAYS[kind](this.W, this.H, this.t, this.halfW);
+    this.pts = Array.isArray(made) ? made : made.pts;
+    this.extra = Array.isArray(made) ? [] : (made.extra ?? []);
     this.total = 0;
     this.lens = [];
     for ( let i = 1; i < this.pts.length; i++ ) {
@@ -803,26 +1120,28 @@ export class WardTraceGame extends MiniGame {
       this.lens.push(l);
       this.total += l;
     }
-    this.state = "idle";
-    this.progress = 0;
-    this.hitDmg = lerp(34, 100, this.t);
-    this.flash = 0;
   }
 
+  static segDist(x, y, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const l2 = dx * dx + dy * dy;
+    let u = l2 ? ((x - a.x) * dx + (y - a.y) * dy) / l2 : 0;
+    u = clamp(u, 0, 1);
+    return { d: Math.hypot(x - (a.x + dx * u), y - (a.y + dy * u)), u };
+  }
+
+  /** Distance to the progress path (d, s) and to any safe corridor (wall). */
   nearest(x, y) {
     let best = { d: Infinity, s: 0 };
     let acc = 0;
     for ( let i = 1; i < this.pts.length; i++ ) {
-      const a = this.pts[i - 1], b = this.pts[i];
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const l2 = dx * dx + dy * dy;
-      let u = l2 ? ((x - a.x) * dx + (y - a.y) * dy) / l2 : 0;
-      u = clamp(u, 0, 1);
-      const px = a.x + dx * u, py = a.y + dy * u;
-      const d = Math.hypot(x - px, y - py);
+      const { d, u } = WardTraceGame.segDist(x, y, this.pts[i - 1], this.pts[i]);
       if ( d < best.d ) best = { d, s: (acc + this.lens[i - 1] * u) / this.total };
       acc += this.lens[i - 1];
     }
+    let wall = best.d;
+    for ( const [a, b] of this.extra ) wall = Math.min(wall, WardTraceGame.segDist(x, y, a, b).d);
+    best.wall = wall;
     return best;
   }
 
@@ -843,7 +1162,7 @@ export class WardTraceGame extends MiniGame {
   onMove(x, y) {
     if ( this.state !== "trace" ) return;
     const n = this.nearest(x, y);
-    if ( n.d > this.halfW ) {
+    if ( n.wall > this.halfW ) {
       this.flash = 1;
       this.damage(this.hitDmg);
       if ( this.running ) {
@@ -853,6 +1172,9 @@ export class WardTraceGame extends MiniGame {
       }
       return;
     }
+    if ( n.d > this.halfW ) return;
+    // Progress may only advance a little per move, so a hop between neighbouring laps does not count.
+    if ( n.s > this.progress + 0.08 ) return;
     this.progress = Math.max(this.progress, n.s);
     const end = this.pts[this.pts.length - 1];
     if ( this.progress >= 0.97 && Math.hypot(x - end.x, y - end.y) <= 18 ) this.win();
@@ -869,11 +1191,18 @@ export class WardTraceGame extends MiniGame {
   draw() {
     const ctx = this.ctx;
     drawBackground(ctx, this.W, this.H, this.flash);
+    ctx.save();
+    if ( this.fog > 0 && this.mouse.x >= 0 ) {
+      ctx.beginPath();
+      ctx.arc(this.mouse.x, this.mouse.y, this.fog, 0, TAU);
+      ctx.clip();
+    }
     ctx.lineJoin = "round"; ctx.lineCap = "round";
     const path = () => {
       ctx.beginPath();
       ctx.moveTo(this.pts[0].x, this.pts[0].y);
       for ( let i = 1; i < this.pts.length; i++ ) ctx.lineTo(this.pts[i].x, this.pts[i].y);
+      for ( const [a, b] of this.extra ) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
     };
     path(); ctx.lineWidth = this.halfW * 2 + 4; ctx.strokeStyle = "#746f86"; ctx.stroke();
     path(); ctx.lineWidth = this.halfW * 2; ctx.strokeStyle = "#17151f"; ctx.stroke();
@@ -889,6 +1218,14 @@ export class WardTraceGame extends MiniGame {
         remaining -= l;
       }
       ctx.lineWidth = 3; ctx.strokeStyle = "rgba(216,178,74,0.8)"; ctx.stroke();
+    }
+    ctx.restore();
+    if ( this.fog > 0 && this.mouse.x >= 0 ) {
+      const g = ctx.createRadialGradient(this.mouse.x, this.mouse.y, this.fog * 0.6, this.mouse.x, this.mouse.y, this.fog);
+      g.addColorStop(0, "rgba(11,10,20,0)");
+      g.addColorStop(1, "rgba(11,10,20,0.95)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(this.mouse.x, this.mouse.y, this.fog, 0, TAU); ctx.fill();
     }
     const s = this.pts[0], e = this.pts[this.pts.length - 1];
     const marker = (p, color, txt) => {

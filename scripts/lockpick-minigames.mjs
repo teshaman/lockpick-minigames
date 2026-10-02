@@ -56,6 +56,7 @@ function registerSettings() {
   reg("maxAttempts", { type: Number, default: 0, range: { min: 0, max: 20, step: 1 } });
   reg("jam", { type: Boolean, default: true });
   reg("cooldown", { type: Number, default: 0, range: { min: 0, max: 600, step: 5 } });
+  reg("dndFormula", { type: Boolean, default: isDnd, config: isDnd });
   reg("skillPath", { type: String, default: isDnd ? "system.skills.slt.total" : "" });
   reg("skillDivisor", { type: Number, default: 2, range: { min: 1, max: 10, step: 1 } });
   reg("tools", { type: String, default: isDnd ? "Thieves' Tools=2" : "" });
@@ -177,12 +178,30 @@ function bestTool(actor) {
   return best;
 }
 
+/**
+ * How much the character's ability lowers the tier.
+ * dnd5e formula (default on dnd5e): Sleight of Hand total + thieves' tools proficiency bonus,
+ * doubled when proficient in both, divided by the skill divisor.
+ * Otherwise: the number at the skill path divided by the divisor.
+ */
 function skillReduction(actor) {
+  const div = Math.max(1, S("skillDivisor"));
+  if ( game.system.id === "dnd5e" && S("dndFormula") ) {
+    const sys = actor.system ?? {};
+    const slt = sys.skills?.slt;
+    const tool = sys.tools?.thief;
+    const prof = Number(sys.attributes?.prof ?? 0);
+    const sltTotal = Number(slt?.total ?? 0);
+    const toolMult = Number(tool?.value ?? tool?.prof?.multiplier ?? 0);
+    let points = sltTotal + Math.floor(toolMult * prof);
+    if ( Number(slt?.value ?? 0) >= 1 && toolMult >= 1 ) points *= 2;
+    return Math.floor(points / div);
+  }
   const path = String(S("skillPath") ?? "").trim();
   if ( !path ) return 0;
   const v = Number(foundry.utils.getProperty(actor, path));
   if ( !Number.isFinite(v) ) return 0;
-  return Math.floor(v / Math.max(1, S("skillDivisor")));
+  return Math.floor(v / div);
 }
 
 /* ------------------------------------------------------------------ */

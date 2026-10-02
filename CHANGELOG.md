@@ -3,6 +3,14 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.1.0 — 2026-10-02
+- Sweet Spot: the pick travels the full circle, one pick, strain reddens it before it breaks.
+- Dual Rotation: new hot/cold search phase before tracking the wandering spot.
+- Pin Tumbler: Oblivion-style pins with hidden notch heights, test pushes, pauses, fewer errors and fake pauses at high tiers.
+- Skill Check: blue double-value caps at both ends of a drifting arc; Tension: Space, right mouse button or the gauge build tension, marker and countdown rings, works reliably.
+- Ward Trace: ten keyway families including grid mazes with safe dead ends; narrower, longer and fogged at high tiers.
+- Harder tuning across all tiers, a How-to text in every lock window, dnd5e skill formula (Sleight of Hand + thieves' tools proficiency, doubled with both).
+
 ## 1.0.0 — 2026-10-02
 - Initial release: six lock-picking minigames (Sweet Spot, Dual Rotation, Pin Tumbler, Skill Check, Tension, Ward Trace) on locked doors and container tokens.
 - Fifteen difficulty tiers, scaled by a skill attribute path and carried tools.

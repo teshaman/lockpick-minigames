@@ -26,7 +26,9 @@ export class GamePanel {
       <div class="lpm-bars">
         <div class="lpm-barbox"><span class="lpm-barlabel">${L("LPM.Bar.Health")}</span><div class="lpm-bar green"><div style="width:100%"></div></div></div>
         <div class="lpm-barbox right"><span class="lpm-barlabel lpm-rightlabel"></span><span class="lpm-righttext"></span><div class="lpm-bar blue"><div style="width:0%"></div></div></div>
-      </div>`;
+      </div>
+      <div class="lpm-howto"><b>${L("LPM.HowTo.Label")}</b> <span></span></div>`;
+    this.howto = root.querySelector(".lpm-howto span");
     this.root = root;
     this.canvas = root.querySelector("canvas");
     this.overlay = root.querySelector(".lpm-overlay");
@@ -44,6 +46,7 @@ export class GamePanel {
     this.overlay.className = "lpm-overlay";
     this.overlay.textContent = "";
     this.hintEl.textContent = "";
+    this.howto.textContent = L(`LPM.HowTo.${Cls.id}`);
     const host = {
       hint: text => { this.hintEl.textContent = text; },
       bars: ({ health, right, rightLabel }) => {
@@ -71,7 +74,7 @@ export class GamePanel {
     const g = this.game;
     if ( !g ) return false;
     return g.rot > 0 || g.hits > 0 || g.count > 0 || g.started || g.progress > 0 || g.health < 100
-      || (g.pins?.some(p => p.set) ?? false);
+      || g.phase === "track" || (g.pins?.some(p => p.set) ?? false);
   }
 }
 
