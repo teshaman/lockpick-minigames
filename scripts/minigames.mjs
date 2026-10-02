@@ -300,6 +300,8 @@ export class SweetSpotGame extends MiniGame {
     this.pickAngle = Math.PI / 2;
     this.stress = 0;
     this.turning = false;
+    this.strained = false;
+    this.settle = this.t >= 0.45 ? lerp(0, 9, (this.t - 0.45) / 0.55) * Math.PI / 180 : 0;
   }
 
   update(dt) {
@@ -314,11 +316,21 @@ export class SweetSpotGame extends MiniGame {
         this.stress = Math.max(0, this.stress - dt * 2);
       } else if ( maxRot < Math.PI / 2 ) {
         this.stress = Math.min(1, this.stress + dt * 4);
+        this.strained = true;
         this.damage(this.drain * dt);
       }
       if ( this.rot >= Math.PI / 2 - 1e-3 ) { this.rot = Math.PI / 2; this.win(); }
     } else {
-      if ( this.turning ) { this.turning = false; this.hint(this.constructor.hintKey); }
+      if ( this.turning ) {
+        this.turning = false;
+        this.hint(this.constructor.hintKey);
+        if ( this.strained && this.settle > 0 ) {
+          // The lock settles: the sweet spot shifts a little after every strained push.
+          this.sweet = (this.sweet + rnd(-this.settle, this.settle) + TAU) % TAU;
+          this.hint("LPM.Hint.sweetSettled");
+        }
+        this.strained = false;
+      }
       this.rot = Math.max(0, this.rot - 3.5 * dt);
       this.stress = Math.max(0, this.stress - dt * 3);
     }
@@ -378,6 +390,9 @@ export class DualRotationGame extends MiniGame {
     this.aligned = false;
     this.fillRate = lerp(40, 18, this.t) * Math.PI / 180;
     this.drain = lerp(40, 110, this.t);
+    this.blinks = this.t >= 0.55;
+    this.blinkIn = rnd(1.5, 3);
+    this.blinkFor = 0;
   }
 
   update(dt) {
@@ -402,6 +417,13 @@ export class DualRotationGame extends MiniGame {
       const s = this.speed * rnd(0.7, 1.3);
       this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
       this.turnIn = rnd(0.35, 1.1);
+    }
+    if ( this.blinks ) {
+      if ( this.blinkFor > 0 ) this.blinkFor -= dt;
+      else {
+        this.blinkIn -= dt;
+        if ( this.blinkIn <= 0 ) { this.blinkFor = lerp(0.25, 0.55, this.t); this.blinkIn = rnd(1.5, 3); }
+      }
     }
     this.sx += this.vx * dt; this.sy += this.vy * dt;
     const dx = this.sx - this.cx, dy = this.sy - this.cy;
@@ -442,6 +464,14 @@ export class DualRotationGame extends MiniGame {
       if ( this.foundTimer > 0 ) {
         ctx.strokeStyle = "#9fd4ff"; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(this.sx, this.sy, 6 + 10 * (1 - this.foundTimer / 0.35), 0, TAU); ctx.stroke();
+      }
+      return;
+    }
+    if ( this.blinkFor > 0 ) {
+      if ( this.mouse.x >= 0 ) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = this.aligned ? PALETTE.green : "rgba(255,255,255,0.55)";
+        ctx.beginPath(); ctx.arc(this.mouse.x, this.mouse.y, 9, 0, TAU); ctx.stroke();
       }
       return;
     }
@@ -489,6 +519,9 @@ export class PinTumblerGame extends MiniGame {
     this.fallSpeed = 3.2;
     this.pause = lerp(0.7, 0.13, this.t);
     const fakes = this.t > 0.45 ? Math.round(lerp(1, 3, (this.t - 0.45) / 0.55)) : 0;
+    this.retestCost = lerp(6, 16, this.t);
+    this.dropOnError = this.t >= 0.7 ? "all" : (this.t >= 0.35 ? "last" : "none");
+    this.lastSet = null;
     this.pins = Array.from({ length: this.n }, () => ({
       notch: rnd(0.35, 0.95),
       fake: null,
@@ -498,9 +531,13 @@ export class PinTumblerGame extends MiniGame {
       known: false,
       set: false,
       flash: 0,
+      pushes: 0,
+      rise: 1,
+      pauseMul: 1,
       passedFake: false,
       passedNotch: false
     }));
+    this.rerollRhythm();
     for ( const p of this.pins.slice().sort(() => Math.random() - 0.5).slice(0, fakes) ) {
       p.fake = Math.random() < 0.5 ? rnd(0.12, p.notch - 0.15) : rnd(p.notch + 0.12, 0.98);
       if ( p.fake < 0.1 || p.fake > 0.99 ) p.fake = null;
@@ -515,6 +552,15 @@ export class PinTumblerGame extends MiniGame {
     this.travel = this.bottom - this.base - this.top - this.pinH - 10;
   }
 
+  /** Every unset pin gets its own rise speed and pause length; called again after each set pin. */
+  rerollRhythm() {
+    for ( const p of this.pins ) {
+      if ( p.set ) continue;
+      p.rise = rnd(0.7, 1.45);
+      p.pauseMul = rnd(0.75, 1.3);
+    }
+  }
+
   update(dt) {
     for ( const p of this.pins ) {
       if ( p.flash > 0 ) p.flash = Math.max(0, p.flash - dt * 3);
@@ -522,11 +568,11 @@ export class PinTumblerGame extends MiniGame {
       if ( p.set ) continue;
       switch ( p.state ) {
         case "rise": {
-          const next = p.pos + this.riseSpeed * dt;
+          const next = p.pos + this.riseSpeed * p.rise * dt;
           if ( p.fake !== null && !p.passedFake && p.pos < p.fake && next >= p.fake ) {
-            p.pos = p.fake; p.passedFake = true; p.state = "fakepause"; p.pauseT = this.pause * 0.45;
+            p.pos = p.fake; p.passedFake = true; p.state = "fakepause"; p.pauseT = this.pause * p.pauseMul * 0.45;
           } else if ( !p.passedNotch && p.pos < p.notch && next >= p.notch ) {
-            p.pos = p.notch; p.passedNotch = true; p.known = true; p.state = "pause"; p.pauseT = this.pause;
+            p.pos = p.notch; p.passedNotch = true; p.known = true; p.state = "pause"; p.pauseT = this.pause * p.pauseMul;
           } else if ( next >= 1 ) {
             p.pos = 1; p.state = "fall";
           } else p.pos = next;
@@ -551,6 +597,9 @@ export class PinTumblerGame extends MiniGame {
     const p = this.pins[i];
     if ( p.set ) return;
     if ( p.state === "idle" ) {
+      p.pushes += 1;
+      if ( p.pushes > 1 ) this.damage(this.retestCost);
+      if ( !this.running ) return;
       p.state = "rise";
       p.passedFake = false; p.passedNotch = false;
       return;
@@ -559,12 +608,18 @@ export class PinTumblerGame extends MiniGame {
       p.set = true;
       p.pos = p.notch;
       p.flash = 1;
-      if ( this.pins.every(q => q.set) ) this.win();
+      this.lastSet = p;
+      if ( this.pins.every(q => q.set) ) return this.win();
+      this.rerollRhythm();
       return;
     }
     this.errors += 1;
     p.flash = -1;
     p.state = "fall";
+    const dropped = this.dropOnError === "all" ? this.pins.filter(q => q.set)
+      : (this.dropOnError === "last" && this.lastSet?.set ? [this.lastSet] : []);
+    for ( const q of dropped ) { q.set = false; q.state = "fall"; q.flash = -1; q.pushes = 0; }
+    if ( dropped.length ) this.lastSet = null;
     this.damage(100 / this.errorsAllowed + 0.01);
   }
 
@@ -664,12 +719,23 @@ export class SkillCheckGame extends MiniGame {
     this.drift = lerp(0.1, 1.6, this.t);
     this.missDmg = lerp(40, 60, this.t);
     this.flash = 0;
+    this.time = 0;
+    this.trapW = this.t >= 0.4 ? this.zoneW * 0.7 : 0;
+    this.breath = this.t >= 0.5 ? lerp(0.2, 0.55, (this.t - 0.5) / 0.5) : 0;
     this.newZone();
   }
 
   newZone() {
     const ahead = rnd(1.2, 4.0) * Math.sign(this.omega);
     this.zone = (this.a + ahead + TAU) % TAU;
+    if ( this.trapW > 0 ) {
+      // A red trap arc on the far side of the ring; clicking in it costs double.
+      this.trap = (this.zone + Math.PI + rnd(-0.9, 0.9) + TAU) % TAU;
+    }
+  }
+
+  inTrap() {
+    return this.trapW > 0 && angDist(this.a, this.trap) <= this.trapW / 2;
   }
 
   /** 0 = miss, 1 = yellow body, 2 = blue cap. */
@@ -680,8 +746,11 @@ export class SkillCheckGame extends MiniGame {
   }
 
   update(dt) {
-    this.a = (this.a + this.omega * dt + TAU) % TAU;
+    this.time += dt;
+    const w = this.omega * (1 + this.breath * Math.sin(this.time * 1.7));
+    this.a = (this.a + w * dt + TAU) % TAU;
     this.zone = (this.zone - Math.sign(this.omega) * this.drift * dt + TAU) % TAU;
+    if ( this.trapW > 0 ) this.trap = (this.trap - Math.sign(this.omega) * this.drift * dt + TAU) % TAU;
     if ( this.flash > 0 ) this.flash = Math.max(0, this.flash - dt * 3);
     else if ( this.flash < 0 ) this.flash = Math.min(0, this.flash + dt * 3);
   }
@@ -697,7 +766,7 @@ export class SkillCheckGame extends MiniGame {
       this.newZone();
     } else {
       this.flash = -1;
-      this.damage(this.missDmg);
+      this.damage(this.missDmg * (this.inTrap() ? 1.5 : 1));
     }
   }
 
@@ -718,6 +787,11 @@ export class SkillCheckGame extends MiniGame {
       ctx.moveTo(this.cx + Math.cos(a) * (this.R - this.width / 2), this.cy + Math.sin(a) * (this.R - this.width / 2));
       ctx.lineTo(this.cx + Math.cos(a) * (this.R + this.width / 2), this.cy + Math.sin(a) * (this.R + this.width / 2));
       ctx.stroke();
+    }
+    if ( this.trapW > 0 ) {
+      ctx.lineWidth = this.width - 4;
+      ctx.strokeStyle = "#8f2a2a";
+      ctx.beginPath(); ctx.arc(this.cx, this.cy, this.R, this.trap - this.trapW / 2, this.trap + this.trapW / 2); ctx.stroke();
     }
     const z0 = this.zone - this.zoneW / 2, z1 = this.zone + this.zoneW / 2;
     ctx.lineWidth = this.width - 4;
@@ -772,6 +846,11 @@ export class TensionGame extends MiniGame {
     this.gaugeHeld = false;
     this.flash = 0;
     this.pulse = 0;
+    this.baseBandHalf = this.bandHalf;
+    this.breath = this.t >= 0.4 ? 0.35 : 0;
+    this.slips = this.t >= 0.6;
+    this.slipIn = rnd(2, 4);
+    this.slipFlash = 0;
   }
 
   get pressing() { return this.space || this.mouse.right || this.gaugeHeld; }
@@ -795,6 +874,17 @@ export class TensionGame extends MiniGame {
     else if ( this.flash < 0 ) this.flash = Math.min(0, this.flash + dt * 3);
     if ( !this.started ) return;
     this.tension = clamp(this.tension + (this.pressing ? this.rise : -this.fall) * dt, 0, 1);
+    if ( this.breath > 0 ) this.bandHalf = this.baseBandHalf * (1 + this.breath * Math.sin(this.pulse * 1.3));
+    if ( this.slipFlash > 0 ) this.slipFlash -= dt;
+    if ( this.slips ) {
+      this.slipIn -= dt;
+      if ( this.slipIn <= 0 ) {
+        // The pick slips: tension drops suddenly and must be rebuilt.
+        this.tension = Math.max(0, this.tension - lerp(0.1, 0.18, this.t));
+        this.slipIn = rnd(2, 4);
+        this.slipFlash = 0.4;
+      }
+    }
     this.bandC += this.bandV * dt;
     const lo = 0.12 + this.bandHalf, hi = 0.86 - this.bandHalf;
     if ( this.bandC < lo ) { this.bandC = lo; this.bandV = Math.abs(this.bandV); }
@@ -839,7 +929,7 @@ export class TensionGame extends MiniGame {
     const gh = this.gBot - this.gTop;
     ctx.fillStyle = "#15141f";
     roundRect(ctx, this.gx, this.gTop, this.gw, gh, 6); ctx.fill();
-    ctx.strokeStyle = this.pressing ? "#d8b24a" : "#8a6d2a"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = this.slipFlash > 0 ? PALETTE.red : (this.pressing ? "#d8b24a" : "#8a6d2a"); ctx.lineWidth = 2; ctx.stroke();
     const bandTop = this.gBot - (this.bandC + this.bandHalf) * gh;
     ctx.fillStyle = "rgba(90,211,90,0.28)";
     ctx.fillRect(this.gx + 2, bandTop, this.gw - 4, this.bandHalf * 2 * gh);
@@ -1118,6 +1208,11 @@ export class WardTraceGame extends MiniGame {
     this.progress = 0;
     this.hitDmg = lerp(45, 100, this.t);
     this.flash = 0;
+    this.time = 0;
+    this.baseHalfW = this.halfW;
+    this.breath = this.t >= 0.55 ? 0.15 : 0;
+    this.timeLimit = this.t >= 0.55 ? this.total / lerp(70, 110, this.t) + 5 : 0;
+    this.timeLeft = this.timeLimit;
   }
 
   build(kind) {
@@ -1157,7 +1252,13 @@ export class WardTraceGame extends MiniGame {
   }
 
   update(dt) {
+    this.time += dt;
     if ( this.flash > 0 ) this.flash = Math.max(0, this.flash - dt * 2);
+    if ( this.breath > 0 ) this.halfW = this.baseHalfW * (1 + this.breath * Math.sin(this.time * 1.5));
+    if ( this.timeLimit > 0 && this.state === "trace" ) {
+      this.timeLeft -= dt;
+      if ( this.timeLeft <= 0 ) { this.hint("LPM.Hint.traceTime"); this.fail(); }
+    }
   }
 
   onDown(x, y) {
@@ -1166,6 +1267,7 @@ export class WardTraceGame extends MiniGame {
     if ( Math.hypot(x - s.x, y - s.y) <= 16 ) {
       this.state = "trace";
       this.progress = 0;
+      this.timeLeft = this.timeLimit;
       this.hint("LPM.Hint.traceGo");
     }
   }
@@ -1252,6 +1354,13 @@ export class WardTraceGame extends MiniGame {
     };
     marker(s, "rgba(90,211,90,1)", "S");
     marker(e, "rgba(255,214,90,1)", "E");
+    if ( this.timeLimit > 0 ) {
+      const frac = clamp(this.timeLeft / this.timeLimit, 0, 1);
+      ctx.fillStyle = "#1a1826";
+      ctx.fillRect(20, 10, this.W - 40, 5);
+      ctx.fillStyle = frac < 0.25 ? PALETTE.red : PALETTE.gold;
+      ctx.fillRect(20, 10, (this.W - 40) * frac, 5);
+    }
     if ( this.state === "trace" && this.mouse.x >= 0 ) {
       ctx.fillStyle = "#ffe066";
       ctx.beginPath(); ctx.arc(this.mouse.x, this.mouse.y, 5, 0, TAU); ctx.fill();

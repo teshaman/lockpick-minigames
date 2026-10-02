@@ -3,6 +3,15 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.3.0 — 2026-10-02
+- Pin Tumbler: every pin has its own rise speed and pause length, rhythms re-roll after each set pin, the first push of a pin is free and later re-tests cost pick health, and an error drops the last set pin from tier 6 and every set pin from tier 11.
+- Sweet Spot: from tier 7 the mechanism settles after a strained push and the sweet spot shifts a little.
+- Dual Rotation: from tier 9 the spot blinks out briefly while you track it.
+- Skill Check: a red trap arc makes a miss cost half again as much, and from tier 8 the needle speeds up and slows down.
+- Tension: the band breathes from tier 7, and from tier 10 the pick slips and tension drops suddenly.
+- Ward Trace: from tier 9 the walls breathe and a timer runs; running out resets the wards.
+- How-to texts and README updated; README lists an Arcane Lock (locked by magic) as a written idea.
+
 ## 1.2.0 — 2026-10-02
 - Dual Rotation: the hidden spot is now a blue ring with a white core and a dark halo, and the search glow is cool blue-white, so it stands out on the brass dial.
 - Harder difficulty curve: mid tiers are eased upward (tier 10 plays at about 73 percent of the scale instead of 64) and the top-end values are harsher in every game (tighter sweet spot and tracking radius, faster pins with shorter pauses and earlier fakes, narrower and faster-drifting skill arc with more hits, thinner tension band with faster drift and more targets, narrower keyways with earlier fog).

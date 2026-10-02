@@ -11,12 +11,12 @@ Press **L** to pick the nearest lock in reach.
 
 | Minigame | How it plays |
 |---|---|
-| Sweet Spot Lock | The pick follows the mouse through a full circle. Hold the left button to turn the cylinder; on the sweet spot it turns all the way, elsewhere it stops part-way and the pick strains, reddens and breaks. One pick. |
-| Dual Rotation Lock | Two phases. Sweep the cursor over the dial: a glow grows warmer near a hidden spot; hold still on it. Then the spot wanders: hold Space (or the left button) and keep the cursor on it while the rotation fills. |
-| Pin Tumbler Lock | Oblivion-style pins. Click a column to push its pin up; it pauses briefly at its own notch height, then drops. Click again during the pause to set it. Wrong-time clicks are errors; the first push reveals the notch. Higher tiers add pins, shorten the pause, cut the allowed errors and add fake pauses. |
-| Skill Check Lock | A needle sweeps the ring while the highlighted arc drifts the other way. Click or press Space inside the arc: yellow counts one, the thin blue caps count two. |
-| Tension Lock | Click the dial to start. Hold Space, the right mouse button, or the left button on the gauge to build tension; keep the marker in the moving green band and left-click the glowing targets before their ring runs out. The red cap burns the pick. |
-| Ward Trace Lock | Click S and trace the keyway to E without touching the walls. Ten pattern families (zigzag, wave, stairs, switchbacks, hairpins, orbits, petals, spirals, grid walks, grid mazes with safe dead ends); higher tiers are narrower, longer and fogged except near the cursor. |
+| Sweet Spot Lock | The pick follows the mouse through a full circle. Hold the left button to turn the cylinder; on the sweet spot it turns all the way, elsewhere it stops part-way and the pick strains, reddens and breaks. One pick. From tier 7 the mechanism settles after a strained push and the spot shifts. |
+| Dual Rotation Lock | Two phases. Sweep the cursor over the dial: a blue glow grows brighter near a hidden spot; hold still on it. Then the spot wanders: hold Space (or the left button) and keep the cursor on it while the rotation fills. From tier 9 it blinks out briefly. |
+| Pin Tumbler Lock | Oblivion-style pins with their own notch height, rise speed and pause length; rhythms re-roll after every set pin. Push a pin (first push free, re-tests cost health), click again during its pause to set it. Wrong-time clicks are errors and, at higher tiers, drop the last or all set pins. Fake pauses from tier 7. |
+| Skill Check Lock | A needle sweeps the ring while the highlighted arc drifts the other way. Click or press Space inside the arc: yellow counts one, the thin blue caps count two. A red trap arc makes a miss cost half again as much, and from tier 8 the needle breathes. |
+| Tension Lock | Click the dial to start. Hold Space, the right mouse button, or the left button on the gauge to build tension; keep the marker in the moving (and, from tier 7, breathing) green band and left-click the glowing targets before their ring runs out. From tier 10 the pick slips and tension drops suddenly. The red cap burns the pick. |
+| Ward Trace Lock | Click S and trace the keyway to E without touching the walls. Ten pattern families (zigzag, wave, stairs, switchbacks, hairpins, orbits, petals, spirals, grid walks, grid mazes with safe dead ends); higher tiers are narrower, longer and fogged except near the cursor, and from tier 9 the walls breathe and a timer runs. |
 
 Every lock window shows a short "How to" text under the bars. Fifteen difficulty tiers (Trivial to Legendary) scale every game: narrower zones, faster movement, more pins and targets, shorter pauses, fewer allowed errors.
 
@@ -33,6 +33,10 @@ Every lock window shows a short "How to" text under the bars. Fifteen difficulty
 - **Chat**: every outcome is whispered to the GM and the player.
 
 An active GM client must be connected; players never write to the scene themselves.
+
+## Ideas not built yet
+
+- **Arcane Lock (locked by magic)**: a seventh minigame for doors and chests sealed with a spell. Glowing glyphs orbit a sigil in the middle of the dial; the player must "attune" by tracing the glyphs in the order they flare, while a mana ring drains the longer they take. Mechanically it could use Arcana instead of Sleight of Hand in the skill formula, ignore thieves' tools, and let a caster spend a spell slot to lower the tier or skip the game (Knock, Dispel Magic), with a failed attempt alerting the caster who placed the ward (a macro hook).
 
 ## API
 
