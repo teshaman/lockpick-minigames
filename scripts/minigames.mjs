@@ -340,7 +340,8 @@ export class SweetSpotGame extends MiniGame {
     const ctx = this.ctx;
     drawBackground(ctx, this.W, this.H, this.stress * 0.8);
     const d = angDist(this.pickAngle, this.sweet);
-    drawDial(ctx, this.cx, this.cy, this.r, this.rot, d <= this.tol ? 0.7 : 0);
+    // Only the two lowest tiers reveal the spot with a glow; above that the partial turn is the only feedback.
+    drawDial(ctx, this.cx, this.cy, this.r, this.rot, this.tier <= 2 && d <= this.tol ? 0.7 : 0);
     const a = this.pickAngle + this.rot;
     const shake = this.stress > 0 ? (Math.random() - 0.5) * this.stress * 10 : 0;
     const len = this.r * 1.25;
@@ -865,7 +866,7 @@ export class TensionGame extends MiniGame {
     this.started = false;
     this.tension = 0;
     this.rise = lerp(0.9, 1.9, this.t);
-    this.fall = lerp(0.7, 1.4, this.t);
+    this.fall = lerp(0.35, 0.75, this.t);
     this.bandHalf = lerp(0.15, 0.035, this.t);
     this.bandC = rnd(0.35, 0.65);
     this.bandV = lerp(0.05, 0.36, this.t) * sign();

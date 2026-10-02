@@ -3,6 +3,10 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## 1.4.1 — 2026-10-02
+- Sweet Spot: the dial no longer glows on the sweet spot above tier 2, so the partial turn is the only feedback.
+- Tension: the gauge falls about half as fast when released.
+
 ## 1.4.0 — 2026-10-02
 - Pin Tumbler: pins bind in a hidden random order that changes every attempt; only the binding pin pauses at its notch, the others spring straight back and turn dull once tested this round.
 - Two test pushes per round are free, further pushes cost pick health; up to tier 9 a wrong push makes the binding pin's base glow for a moment, on the lowest tiers it glows all the time.
