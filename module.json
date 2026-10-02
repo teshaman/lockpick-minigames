@@ -1,0 +1,31 @@
+{
+  "id": "lockpick-minigames",
+  "title": "Lockpick Minigames",
+  "description": "Turns locked doors and container tokens into interactive lock-picking minigames: six games, fifteen difficulty tiers, keys, tools, skill-based difficulty, attempt limits and cooldowns, Item Piles support.",
+  "version": "1.0.0",
+  "manifest": "https://github.com/teshaman/lockpick-minigames/releases/latest/download/module.json",
+  "download": "https://github.com/teshaman/lockpick-minigames/releases/download/1.0.0/module.zip",
+  "authors": [
+    { "name": "Pillars of Palor" }
+  ],
+  "esmodules": [
+    "./scripts/lockpick-minigames.mjs"
+  ],
+  "styles": [
+    "./styles/lockpick-minigames.css"
+  ],
+  "languages": [
+    { "lang": "en", "name": "English", "path": "lang/en.json" }
+  ],
+  "socket": true,
+  "relationships": {
+    "optional": [
+      { "id": "lib-wrapper", "type": "module", "reason": "Safer wrapping of door and token click handlers next to other modules." },
+      { "id": "item-piles", "type": "module", "reason": "Locked container piles open their inventory after a successful pick." }
+    ]
+  },
+  "compatibility": {
+    "minimum": "13.0",
+    "verified": "14.367"
+  }
+}
