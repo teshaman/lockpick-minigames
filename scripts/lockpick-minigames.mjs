@@ -602,14 +602,31 @@ function pickNearest() {
     ...canvas.tokens.placeables.map(t => t.document),
     ...canvas.tokens.placeables.flatMap(t => t.actor?.items.contents ?? [])
   ].filter(d => isLocked(d) && isPickable(d));
-  let best = null;
+  const near = [];
   for ( const d of docs ) {
     const dist = distanceTo(token, d);
     if ( maxDist > 0 && dist > maxDist ) continue;
-    if ( !best || dist < best.dist ) best = { doc: d, dist };
+    if ( openApps.has(d.uuid) ) continue;
+    near.push({ doc: d, dist });
   }
-  if ( !best ) return ui.notifications.warn(L("LPM.Notify.NothingNear"));
-  attempt(best.doc);
+  if ( !near.length ) return ui.notifications.warn(L("LPM.Notify.NothingNear"));
+  near.sort((a, b) => a.dist - b.dist);
+  if ( near.length === 1 ) return attempt(near[0].doc);
+  chooseLock(near);
+}
+
+/** Several locks in reach: let the player pick which one to work on. */
+async function chooseLock(near) {
+  const units = canvas.scene.grid.units;
+  const options = near.map((n, i) => `<option value="${i}">${docName(n.doc)} ${F("LPM.Pick.Distance", { d: Math.round(n.dist), units })}</option>`).join("");
+  const idx = await foundry.applications.api.DialogV2.prompt({
+    window: { title: L("LPM.Pick.ChooseTitle") },
+    content: `<p>${L("LPM.Pick.ChooseHint")}</p><div class="form-group"><select name="lock" autofocus>${options}</select></div>`,
+    ok: { label: L("LPM.Pick.ChooseOk"), icon: "fa-solid fa-unlock-keyhole", callback: (ev, button) => Number(button.form.elements.lock.value) },
+    rejectClose: false
+  });
+  if ( idx === null || idx === undefined || !near[idx] ) return;
+  attempt(near[idx].doc);
 }
 
 /* ------------------------------------------------------------------ */

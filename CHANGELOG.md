@@ -3,7 +3,9 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
-## Unreleased — 2026-10-03
+## 1.7.2 — 2026-10-03
+- **L** hotkey: when several locks are within reach (your own collar and a friend's, a door and a chest) a small window asks which one to pick, instead of silently taking the nearest. Locks whose window is already open are skipped.
+- "Nothing in reach" warning now mentions items; README explains that **Pick lock** sits in the item sheet's ⋮ header menu.
 - Open source under the MIT License (LICENSE file, `license` in module.json).
 - Info page on GitHub Pages: https://teshaman.github.io/lockpick-minigames/ (`docs/` folder, kept out of module.zip); `url`, `readme`, `changelog` and `bugs` added to module.json.
 - README: credits to Reslin for the original Lock Picking idea (https://www.patreon.com/cw/Reslinfvtt) and an ownership disclaimer.

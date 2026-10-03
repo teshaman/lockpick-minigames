@@ -9,7 +9,7 @@ System agnostic; sensible defaults for dnd5e.
 
 Click a locked door (or double-click a locked container token) within reach of your token and a lock window opens.
 Beat the minigame and the GM's client unlocks the door or container; fail and the attempt is recorded.
-Press **L** to pick the nearest lock in reach.
+Press **L** to pick a lock in reach: with one lock nearby it opens at once, with several (your own collar and a friend's, say) a small window asks which one.
 
 | Minigame | How it plays |
 |---|---|
@@ -26,7 +26,7 @@ Every lock window shows a short "How to" text under the bars. A failed Arcane Lo
 ## What GMs get
 
 - **Door locks**: lock a door as usual (right-click its control). With *Locked doors are pickable* on, every locked door uses the world defaults. Open the wall's config sheet and press **Lock settings…** to give a door its own minigame, tier, key item, attempt limit, cooldown and macros.
-- **Item locks**: open an item's sheet (a collar, manacles, a strongbox in a pack) and press the lock button in its header to configure it, set *Pickable* to Yes and press **Lock**. The wearer, or anyone within reach of the wearer's token, can pick it: owners get a **Pick lock** header button on the item sheet, everyone can use the **L** hotkey. On success the item can simply be marked unlocked, unequipped, or removed from the inventory, and the success macro runs.
+- **Item locks**: open an item's sheet (a collar, manacles, a strongbox in a pack) and press the lock button in its header to configure it, set *Pickable* to Yes and press **Lock**. The wearer, or anyone within reach of the wearer's token, can pick it: owners find **Pick lock** in the item sheet's header menu (the ⋮ button), everyone can use the **L** hotkey, which asks which lock when several are in reach. On success the item can simply be marked unlocked, unequipped, or removed from the inventory, and the success macro runs.
 - **Container locks**: select a token, press the lock button in its HUD, set *Pickable* to Yes and press **Lock**. Locked Item Piles containers open their inventory automatically after a successful pick, and *Lock* / *Unlock* also lock or unlock the pile.
 - **Keys**: a character carrying an item named like the lock's key opens it without a minigame (optionally consuming the item).
 - **Tools**: list tool item names with a tier reduction in the settings (`Thieves' Tools=2; Masterwork Picks=4`). The best tool carried lowers the tier; tools can be required, and can break on failure.
