@@ -3,6 +3,11 @@
 All notable changes to this module. Newest version first.
 Older packaged zips are kept in `backups/` and are never deleted.
 
+## Unreleased — 2026-10-03
+- Open source under the MIT License (LICENSE file, `license` in module.json).
+- Info page on GitHub Pages: https://teshaman.github.io/lockpick-minigames/ (`docs/` folder, kept out of module.zip); `url`, `readme`, `changelog` and `bugs` added to module.json.
+- README: credits to Reslin for the original Lock Picking idea (https://www.patreon.com/cw/Reslinfvtt) and an ownership disclaimer.
+
 ## 1.7.1 — 2026-10-02
 - The lock window header now names the skill that lowered the tier: Arcana for Arcane Locks, Sleight of Hand + tools for the others.
 

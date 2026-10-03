@@ -1,5 +1,7 @@
 # Lockpick Minigames
 
+**Info page:** https://teshaman.github.io/lockpick-minigames/ · Free and open source (MIT) · see [Credits and disclaimer](#credits-and-disclaimer)
+
 Turns locked doors and container tokens in Foundry VTT into interactive lock-picking minigames.
 System agnostic; sensible defaults for dnd5e.
 
@@ -59,3 +61,17 @@ Paste this manifest URL into Foundry's **Install Module** dialog:
 `https://github.com/teshaman/lockpick-minigames/releases/latest/download/module.json`
 
 Or upload the packaged zip to The Forge. Optional: lib-wrapper, Item Piles.
+
+## Credits and disclaimer
+
+**The idea is Reslin's.** Lock-picking minigames on Foundry doors come from the paid *Lock Picking* module by Reslin
+(https://foundryvtt.com/packages/lock-picking). This module is an independent, from-scratch take on that idea for my own
+table; it contains none of Reslin's code or assets and is not affiliated with or endorsed by Reslin. If you like the concept,
+support the original: **https://www.patreon.com/cw/Reslinfvtt**.
+
+**I own none of this code.** I claim no ownership of it and release the whole module as free, open-source software. No code or asset from any other module or author has been copied into it. No warranty;
+use at your own risk.
+
+## License
+
+[MIT](LICENSE).

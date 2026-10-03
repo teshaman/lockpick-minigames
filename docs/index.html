@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lockpick Minigames — Foundry VTT module</title>
+<meta name="description" content="Lockpick Minigames turns locked doors, containers and items in Foundry VTT into seven interactive lock-picking minigames with fifteen difficulty tiers, keys, tools, skill scaling and spectating. Free, open source (MIT).">
+<style>
+  :root{--bg:#15120f;--panel:#1f1a15;--panel2:#272019;--ink:#efe6d6;--muted:#b7a98f;--brass:#d4a847;--brass2:#f0cf7a;--line:#3a3025;--warn:#e0a46a;--link:#f0cf7a}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Georgia,"Times New Roman",serif}
+  a{color:var(--link)}
+  code,pre,kbd{font-family:Consolas,"Fira Mono",monospace;font-size:.92em}
+  code{background:#0f0c0a;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+  kbd{background:#0f0c0a;border:1px solid #5a4b36;border-bottom-width:3px;border-radius:4px;padding:1px 6px}
+  pre{background:#0f0c0a;border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow:auto}
+  pre code{border:0;background:none;padding:0}
+  .wrap{max-width:980px;margin:0 auto;padding:0 16px}
+  header.hero{background:radial-gradient(ellipse at top,#3a2c17 0%,var(--bg) 70%);border-bottom:1px solid var(--line);padding:56px 0 40px;text-align:center}
+  .hero h1{font-size:2.6rem;margin:0 0 8px;color:var(--brass2);letter-spacing:.5px}
+  .hero p.tag{font-size:1.2rem;color:var(--muted);margin:0 auto 20px;max-width:720px}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:22px}
+  .badge{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:.85rem;color:var(--muted)}
+  .badge b{color:var(--brass2);font-weight:600}
+  .btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  .btn{display:inline-block;background:var(--brass);color:#1a1409;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:6px;border:1px solid #a37d2a}
+  .btn.alt{background:transparent;color:var(--brass2);border-color:var(--brass)}
+  nav.toc{position:sticky;top:0;z-index:5;background:rgba(21,18,15,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(4px)}
+  nav.toc ul{list-style:none;margin:0;padding:8px 0;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.9rem}
+  nav.toc a{color:var(--muted);text-decoration:none}
+  nav.toc a:hover{color:var(--brass2)}
+  main section{padding:36px 0 8px;border-bottom:1px solid var(--line)}
+  h2{color:var(--brass2);font-size:1.7rem;margin:0 0 14px}
+  h3{color:var(--ink);font-size:1.2rem;margin:26px 0 8px}
+  .note{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--brass);border-radius:6px;padding:14px 18px;margin:18px 0}
+  .note.warn{border-left-color:var(--warn)}
+  .note h3{margin-top:0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:16px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px}
+  .card h3{margin:0 0 6px;color:var(--brass2);font-size:1.1rem}
+  .card p{margin:6px 0;color:var(--ink)}
+  .card .tiers{color:var(--muted);font-size:.9rem}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.95rem}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--brass2)}
+  tr:nth-child(even) td{background:var(--panel)}
+  ul.feat li{margin:6px 0}
+  .copy{display:flex;gap:8px;align-items:stretch;margin:10px 0}
+  .copy input{flex:1;min-width:0;background:#0f0c0a;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:9px 10px;font-family:Consolas,monospace}
+  .copy button{background:var(--brass);border:1px solid #a37d2a;border-radius:6px;padding:0 14px;font-weight:700;cursor:pointer;color:#1a1409}
+  footer{padding:30px 0 50px;color:var(--muted);font-size:.9rem;text-align:center}
+  .small{color:var(--muted);font-size:.9rem}
+  @media (max-width:600px){.hero h1{font-size:2rem}table{font-size:.85rem}th,td{padding:6px}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Lockpick Minigames</h1>
+    <p class="tag">Locked doors, containers and items in Foundry VTT become real lock-picking minigames. Seven games, fifteen difficulty tiers, keys, tools, skill-scaled difficulty and live spectating.</p>
+    <div class="badges">
+      <span class="badge">Version <b>1.7.1</b></span>
+      <span class="badge">Foundry <b>v13 – v14</b></span>
+      <span class="badge">System <b>agnostic</b>, tuned for dnd5e</span>
+      <span class="badge">License <b>MIT</b></span>
+      <span class="badge"><b>Free</b> and open source</span>
+    </div>
+    <div class="btns">
+      <a class="btn" href="#install">Install</a>
+      <a class="btn alt" href="https://github.com/teshaman/lockpick-minigames">Source on GitHub</a>
+      <a class="btn alt" href="https://github.com/teshaman/lockpick-minigames/releases">Releases</a>
+      <a class="btn alt" href="https://teshaman.github.io/disable-electrum/">Disable Electrum (other module)</a>
+    </div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap"><ul>
+  <li><a href="#disclaimer">Disclaimer &amp; credits</a></li>
+  <li><a href="#overview">What it does</a></li>
+  <li><a href="#games">The seven minigames</a></li>
+  <li><a href="#difficulty">Difficulty &amp; skill</a></li>
+  <li><a href="#gm">GM features</a></li>
+  <li><a href="#settings">Settings</a></li>
+  <li><a href="#api">API</a></li>
+  <li><a href="#install">Install</a></li>
+  <li><a href="#changelog">Changelog</a></li>
+  <li><a href="#license">License</a></li>
+</ul></div></nav>
+
+<main class="wrap">
+
+<section id="disclaimer">
+  <h2>Disclaimer and credits</h2>
+  <div class="note warn">
+    <h3>I own none of this code</h3>
+    <p>I claim no ownership of this code. I only steered the project: what the games should feel like, how hard they should be, what a GM needs. I release the whole module as <strong>free, open-source software under the MIT License</strong>, so anyone can use it, study it, change it and redistribute it.</p>
+    <p>No code, art, sound or other asset from any other module or author has been copied into this project. There is no warranty of any kind; use it at your own risk and keep backups of your world.</p>
+  </div>
+  <div class="note">
+    <h3>Credit for the original idea: Reslin</h3>
+    <p>The idea of turning locked doors into playable lock-picking minigames inside Foundry VTT is not mine. It comes from the <strong>Lock Picking</strong> module by <strong>Reslin</strong> (<a href="https://foundryvtt.com/packages/lock-picking">foundryvtt.com/packages/lock-picking</a>). This module is an independent take on that idea, built from scratch for my own table. It contains none of Reslin's code or assets, and it is not affiliated with or endorsed by Reslin.</p>
+    <p>If you like the concept, please support the person who came up with it: <a href="https://www.patreon.com/cw/Reslinfvtt"><strong>patreon.com/cw/Reslinfvtt</strong></a>. Reslin's original is the polished, supported module; this one is a free community alternative.</p>
+  </div>
+</section>
+
+<section id="overview">
+  <h2>What it does</h2>
+  <p>Normally a locked door in Foundry is a dead end until the GM unlocks it. With Lockpick Minigames a player clicks the locked door (or a locked container token, or a locked item such as a collar) while standing within reach, and a lock window opens. They play a short skill-based minigame. Win, and the GM's client unlocks or opens the door, container or item. Fail, and the attempt is recorded, a cooldown may start, their tools may break, and the lock may eventually jam.</p>
+  <ul class="feat">
+    <li><strong>Seven minigames</strong>: Sweet Spot, Dual Rotation, Pin Tumbler, Skill Check, Tension, Ward Trace and the magical Arcane Lock. Each lock can pick its own game, or draw a random one.</li>
+    <li><strong>Fifteen difficulty tiers</strong> from Trivial to Legendary. Every game scales: narrower zones, faster movement, more pins and targets, shorter pauses, fewer allowed errors, extra hazards at high tiers.</li>
+    <li><strong>The character's skill matters in every game.</strong> On dnd5e the Sleight of Hand total, thieves' tools proficiency and carried tools lower the tier the player actually plays. Arcane Locks use Arcana and the spellcasting modifier instead. Other systems point the module at any actor data path.</li>
+    <li><strong>Keys, tools, attempts, cooldowns, jamming</strong>, success and failure macros, chat whispers, Item Piles support, an L hotkey, a playground, and live read-only spectating for the rest of the table.</li>
+    <li><strong>Safe by design</strong>: players never write to the scene. Results go over the module socket to the active GM client, which does the unlocking, bookkeeping and item changes.</li>
+    <li><strong>Every lock window shows a short "How to" text</strong>, so players learn each game at the table.</li>
+  </ul>
+  <h3>How a player uses it</h3>
+  <ol>
+    <li>Move your token within reach of the lock (10 ft by default).</li>
+    <li>Click the locked door, double-click the locked container token, press the <strong>Pick lock</strong> button on a locked item sheet, or just press <kbd>L</kbd> to pick the nearest lock in reach.</li>
+    <li>If you carry the lock's key item, it opens at once (the key can be consumed). Otherwise the minigame opens.</li>
+    <li>Read the How-to line, play, and watch the pick-health and progress bars.</li>
+    <li>The outcome is whispered to you and the GM. On success the door unlocks (or opens), the container opens, or the item is unlocked, unequipped or removed, as the GM configured.</li>
+  </ol>
+</section>
+
+<section id="games">
+  <h2>The seven minigames</h2>
+  <div class="grid">
+    <div class="card"><h3>Sweet Spot Lock</h3>
+      <p>The pick follows the mouse through a full circle. Hold the left button to turn the cylinder: on the sweet spot it turns all the way, elsewhere it stops part-way and the pick strains, reddens and breaks. One pick.</p>
+      <p class="tiers">Tiers 1–2 glow on the spot. From tier 7 the mechanism settles after a strained push and the spot shifts.</p></div>
+    <div class="card"><h3>Dual Rotation Lock</h3>
+      <p>Two phases. First sweep the cursor over the dial: a blue glow grows brighter near a hidden spot; hold still on it. Then the spot wanders: hold <kbd>Space</kbd> (or the left button) and keep the cursor on it while the rotation fills.</p>
+      <p class="tiers">From tier 9 the spot blinks out briefly while you track it.</p></div>
+    <div class="card"><h3>Pin Tumbler Lock</h3>
+      <p>Oblivion-style pins with hidden notch heights that bind in a hidden random order. Push a pin to test it: only the binding pin pauses at its notch, the rest spring back and turn dull. Click the binder during its pause to set it. A pin's first push per round is free; re-pushing a tested pin costs pick health.</p>
+      <p class="tiers">Low tiers glow the binder. Fake pauses from tier 7. Wrong-time clicks drop the last set pin from tier 6 and every set pin from tier 11.</p></div>
+    <div class="card"><h3>Skill Check Lock</h3>
+      <p>A needle sweeps the ring while the highlighted arc drifts the other way. Click or press <kbd>Space</kbd> inside the arc: yellow counts one, the thin blue caps count two. A red trap arc makes a miss cost half again as much.</p>
+      <p class="tiers">From tier 8 the needle "breathes" (speeds up and slows down).</p></div>
+    <div class="card"><h3>Tension Lock</h3>
+      <p>Click the dial to start. Hold <kbd>Space</kbd>, the right mouse button, or the left button on the gauge to build tension; keep the marker in the moving green band and left-click the glowing targets before their ring runs out. The red cap burns the pick.</p>
+      <p class="tiers">From tier 7 the band breathes. From tier 10 the pick slips and tension drops suddenly.</p></div>
+    <div class="card"><h3>Ward Trace Lock</h3>
+      <p>Click S and trace the keyway to E without touching the walls. Ten pattern families: zigzag, wave, stairs, switchbacks, hairpins, orbits, petals, spirals, grid walks and grid mazes with safe dead ends.</p>
+      <p class="tiers">Higher tiers are narrower, longer and fogged except near the cursor; from tier 9 the walls breathe and a timer runs.</p></div>
+    <div class="card"><h3>Arcane Lock</h3>
+      <p>A magical ward. Runes orbit a sigil and flare in a sequence that grows each round; click them back in order while they keep moving. Wrong runes damage the pick and replay the sequence; the mana ring drains while you cast and ends the attempt when empty.</p>
+      <p class="tiers">Never part of the random pick: choose it on a lock. Tools do not apply; Arcana plus the spellcasting modifier lower the tier. High tiers add runes and rounds, spin and flip the orbit, and shuffle rune positions. A failed Arcane Lock can alert the caster who placed it through the failure macro.</p></div>
+  </div>
+</section>
+
+<section id="difficulty">
+  <h2>Difficulty and skill</h2>
+  <p>Every lock has a <strong>difficulty tier</strong> from 1 (Trivial) to 15 (Legendary). The tier the player actually plays is the lock's tier minus a reduction earned from their character, so a master thief breezes through a tier 8 lock that would stump a paladin. The reduction applies to all seven games.</p>
+  <h3>dnd5e formula (default)</h3>
+  <p><code>points = Sleight of Hand total + thieves' tools proficiency bonus + flat amount of the best carried tool</code>, <strong>doubled</strong> when the character is proficient in both Sleight of Hand and thieves' tools. The tier drops by <code>floor(points / divisor)</code> (divisor 2 by default). An unproficient character still benefits from carrying tools.</p>
+  <p><strong>Arcane Locks</strong> use <code>Arcana total + spellcasting ability modifier</code>, doubled when proficient in Arcana and a spellcaster, and ignore tools.</p>
+  <h3>Other systems</h3>
+  <p>Switch the dnd5e formula off and give the module any actor data path, for example <code>system.abilities.dex.mod</code> or <code>system.skills.slt.total</code>. Carried tools from the tools list then lower the tier directly. Arcane Locks have their own path setting.</p>
+  <h3>Tools and keys</h3>
+  <ul class="feat">
+    <li><strong>Tools</strong> are listed by item name with their amount, for example <code>Thieves' Tools=2; Masterwork Picks=4</code>. The best tool carried counts. Tools can be <em>required</em> to attempt a lock, and can break (be consumed) on failure with a configurable chance.</li>
+    <li><strong>Keys</strong>: a character carrying an item named like the lock's key (several names allowed) opens it without a minigame. The key can optionally be consumed.</li>
+  </ul>
+</section>
+
+<section id="gm">
+  <h2>GM features</h2>
+  <div class="grid">
+    <div class="card"><h3>Door locks</h3><p>Lock a door as usual (right-click its control). With <em>Locked doors are pickable</em> on, every locked door uses the world defaults. Open the wall's config sheet and press <strong>Lock settings…</strong> to give a door its own minigame, tier, key item, attempt limit, cooldown and macros. GMs hold <kbd>Ctrl</kbd> and click a locked door to try its minigame for real.</p></div>
+    <div class="card"><h3>Container locks</h3><p>Select a token and press the lock button in its HUD, set <em>Pickable</em> to Yes and press <strong>Lock</strong>. Locked Item Piles containers open their inventory automatically after a successful pick, and Lock / Unlock also lock or unlock the pile.</p></div>
+    <div class="card"><h3>Item locks</h3><p>Open an item's sheet (a collar, manacles, a strongbox in a pack) and press the lock button in its header. The wearer, or anyone within reach of the wearer's token, can pick it. On success the item is marked unlocked, unequipped, or removed from the inventory, and the success macro runs.</p></div>
+    <div class="card"><h3>Attempts, cooldowns, jamming</h3><p>Per-player attempt limits and failure cooldowns, set globally or per lock. When attempts run out the lock can jam until the GM resets it (or a key is used). The lock settings window shows state, failed attempts, and Lock / Unlock / Reset / Test buttons.</p></div>
+    <div class="card"><h3>Macros</h3><p>Name a macro to run on success or failure. It receives <code>actor</code>, <code>token</code>, <code>lockDocument</code>, <code>user</code>, <code>success</code>, <code>via</code> and <code>jammed</code>, so a failed pick can trigger an alarm, a trap, or alert the wizard who cast the Arcane Lock.</p></div>
+    <div class="card"><h3>Spectators</h3><p>While a player picks a lock, everyone else (or only the GM, or nobody) gets a small prompt at the top of the screen: "X is picking Y — Watch". Pressing Watch opens a live read-only window of the same game, joining at the current state. Each client can choose prompt, open automatically, or never. The window closes itself two seconds after the result.</p></div>
+    <div class="card"><h3>Playground</h3><p><em>Module Settings → Lockpick Minigames → Open the playground</em> runs any game at any tier with no lock attached, for learning the games or tuning difficulty.</p></div>
+    <div class="card"><h3>Chat and smoothness</h3><p>Every outcome is whispered to the GM and the player. While a lock window is open the client caps Foundry's scene canvas at 20 FPS (per client, 0 to disable) so the minigame gets the frames on heavy scenes.</p></div>
+  </div>
+  <p class="small">An active GM client must be connected while players pick locks. Optional modules: <strong>lib-wrapper</strong> (safer wrapping of door and token click handlers next to other modules) and <strong>Item Piles</strong> (locked container piles open after a successful pick).</p>
+</section>
+
+<section id="settings">
+  <h2>Settings reference</h2>
+  <h3>World settings</h3>
+  <table>
+    <tr><th>Setting</th><th>What it does</th></tr>
+    <tr><td>Locked doors are pickable</td><td>Every locked door can be picked with the world defaults unless its own lock settings say otherwise. Tokens and items must always be configured.</td></tr>
+    <tr><td>Default minigame</td><td>Used by locks that do not choose their own (random or a specific game).</td></tr>
+    <tr><td>Default difficulty</td><td>Tier 1–15 used by locks that do not set their own.</td></tr>
+    <tr><td>Interaction distance</td><td>Maximum distance in scene units from the player's token to the lock. 0 disables the check.</td></tr>
+    <tr><td>Default max attempts per player</td><td>0 is unlimited. Locks can override this.</td></tr>
+    <tr><td>Jam the lock when attempts run out</td><td>A jammed lock refuses further picking until the GM resets it or a key is used.</td></tr>
+    <tr><td>Default cooldown after failure</td><td>Seconds; 0 is none. Locks can override this.</td></tr>
+    <tr><td>dnd5e skill formula</td><td>On: Sleight of Hand + thieves' tools + carried tool, doubled with both; Arcane Locks use Arcana + spellcasting modifier. Off: use the attribute paths below.</td></tr>
+    <tr><td>Skill attribute path</td><td>Actor data path of the number that lowers the difficulty on other systems or with the formula off.</td></tr>
+    <tr><td>Arcane skill attribute path</td><td>Same, for Arcane Locks.</td></tr>
+    <tr><td>Skill divisor</td><td>The tier drops by floor(points / divisor).</td></tr>
+    <tr><td>Lock-picking tools</td><td>Item names and amounts, separated by semicolons. The best tool carried counts.</td></tr>
+    <tr><td>Tools required</td><td>Players without one of the listed tools cannot attempt a lock.</td></tr>
+    <tr><td>Tool break chance on failure (%)</td><td>Chance that one tool item is consumed when an attempt fails.</td></tr>
+    <tr><td>Open doors on success</td><td>Off: a picked door becomes unlocked and the player opens it with a second click.</td></tr>
+    <tr><td>Chat messages</td><td>Whisper the outcome of every attempt to the GM and the player.</td></tr>
+    <tr><td>Others can watch attempts</td><td>Nobody / the GM only / everyone gets the live spectator window.</td></tr>
+    <tr><td>Playground</td><td>Menu button that opens the playground.</td></tr>
+  </table>
+  <h3>Client settings</h3>
+  <table>
+    <tr><th>Setting</th><th>What it does</th></tr>
+    <tr><td>When someone else picks a lock</td><td>Ask me (prompt with a Watch button) / open the window automatically / never.</td></tr>
+    <tr><td>Scene frame rate while a lock window is open</td><td>Caps Foundry's own canvas at this many FPS while you pick, watch or play in the playground. 0 leaves the scene alone.</td></tr>
+  </table>
+  <h3>Per-lock settings (door, token or item)</h3>
+  <table>
+    <tr><th>Field</th><th>What it does</th></tr>
+    <tr><td>Pickable</td><td>World default / Yes / No.</td></tr>
+    <tr><td>Minigame</td><td>World default, random, or one of the seven games.</td></tr>
+    <tr><td>Difficulty tier</td><td>1–15; the character's skill and tools lower the tier they actually play.</td></tr>
+    <tr><td>Key item</td><td>Item name(s); a carrier opens the lock without a minigame. Optional <em>Consume the key</em>.</td></tr>
+    <tr><td>Max attempts per player</td><td>-1 uses the world setting, 0 is unlimited.</td></tr>
+    <tr><td>Cooldown after failure</td><td>Seconds; -1 uses the world setting, 0 is none.</td></tr>
+    <tr><td>Macro on success / failure</td><td>Macro names, run by the GM client with the lock context.</td></tr>
+    <tr><td>When unlocked (item)</td><td>Just mark it unlocked / unequip it / remove it from the inventory.</td></tr>
+    <tr><td>State &amp; buttons</td><td>Locked / Unlocked / Jammed, failed attempts, Lock, Unlock, Reset attempts, Test.</td></tr>
+  </table>
+  <h3>Keybinding</h3>
+  <p><kbd>L</kbd> — pick the nearest lock in reach (doors, container tokens, and locked items on tokens in reach). Rebindable in Configure Controls.</p>
+</section>
+
+<section id="api">
+  <h2>API</h2>
+<pre><code>const api = game.modules.get("lockpick-minigames").api;
+api.attempt(doc);     // start an attempt on a WallDocument, TokenDocument or Item
+api.configure(doc);   // open the lock settings window
+api.lock(doc);
+api.unlock(doc);
+api.resetState(doc);  // clear attempts, cooldowns and jam
+api.getLock(doc);     // effective configuration
+api.demo();           // playground</code></pre>
+  <p>Lock configuration lives in <code>flags.lockpick-minigames.lock</code>, attempt state in <code>flags.lockpick-minigames.state</code>, and a token's or item's locked state in <code>flags.lockpick-minigames.locked</code>. Lock requests resolve documents by UUID.</p>
+</section>
+
+<section id="install">
+  <h2>Install</h2>
+  <p>In Foundry's setup screen open <strong>Add-on Modules → Install Module</strong> and paste this manifest URL:</p>
+  <div class="copy"><input id="manifest" readonly value="https://github.com/teshaman/lockpick-minigames/releases/latest/download/module.json"><button onclick="navigator.clipboard.writeText(document.getElementById('manifest').value);this.textContent='Copied'">Copy</button></div>
+  <p>Or download <code>module.zip</code> from the <a href="https://github.com/teshaman/lockpick-minigames/releases">releases page</a> and upload it to The Forge or unzip it into <code>Data/modules</code>. Then enable <strong>Lockpick Minigames</strong> in the world's Manage Modules. To install a specific older version use <code>https://github.com/teshaman/lockpick-minigames/releases/download/&lt;version&gt;/module.json</code>.</p>
+  <table>
+    <tr><th>Compatibility</th><th></th></tr>
+    <tr><td>Foundry VTT</td><td>v13 minimum, verified on v14</td></tr>
+    <tr><td>Game system</td><td>Any. dnd5e gets the built-in skill formula; other systems use an attribute path.</td></tr>
+    <tr><td>Optional modules</td><td>lib-wrapper, Item Piles</td></tr>
+  </table>
+</section>
+
+<section id="changelog">
+  <h2>Changelog</h2>
+  <p>The full history is in <a href="https://github.com/teshaman/lockpick-minigames/blob/main/CHANGELOG.md">CHANGELOG.md</a>. Highlights:</p>
+  <ul class="feat">
+    <li><strong>1.7.x</strong> — Item locks (collars, manacles, strongboxes), opt-in spectating with a Watch prompt, the window header names the skill that lowered the tier.</li>
+    <li><strong>1.6.0</strong> — Live spectator windows, cached drawing layers and a scene frame-rate cap for smoother play.</li>
+    <li><strong>1.5.0</strong> — Arcane Lock, the seventh minigame.</li>
+    <li><strong>1.4.x</strong> — Pin Tumbler pins bind in a hidden random order; tuning after play-testing.</li>
+    <li><strong>1.3.0</strong> — Tier-gated hazards in every game (settling, blinking, fakes, trap arcs, slips, breathing walls, timers).</li>
+    <li><strong>1.2.0</strong> — Harder difficulty curve, high-contrast Dual Rotation spot.</li>
+    <li><strong>1.1.x</strong> — Full-circle Sweet Spot, two-phase Dual Rotation, Oblivion-style Pin Tumbler, How-to texts, dnd5e skill formula.</li>
+    <li><strong>1.0.0</strong> — First release with six games, fifteen tiers, keys, tools, attempts, cooldowns, jamming and macros.</li>
+  </ul>
+</section>
+
+<section id="license">
+  <h2>License</h2>
+  <p>Lockpick Minigames is released under the <a href="https://github.com/teshaman/lockpick-minigames/blob/main/LICENSE">MIT License</a>. You may use, copy, modify, merge, publish, distribute, sublicense and sell copies, provided the license notice stays with it. The software is provided "as is", without warranty of any kind.</p>
+  <p>See the <a href="#disclaimer">disclaimer</a> above: I claim no ownership of the code. The idea belongs to Reslin, whose Lock Picking module you can support at <a href="https://www.patreon.com/cw/Reslinfvtt">patreon.com/cw/Reslinfvtt</a>.</p>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Lockpick Minigames · <a href="https://github.com/teshaman/lockpick-minigames">GitHub</a> · <a href="https://github.com/teshaman/lockpick-minigames/issues">Report an issue</a> · <a href="https://teshaman.github.io/disable-electrum/">Disable Electrum</a><br>
+    Not affiliated with Foundry Gaming LLC or Reslin. Foundry VTT is a trademark of Foundry Gaming LLC.
+  </div>
+</footer>
+</body>
+</html>

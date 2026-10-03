@@ -32,7 +32,7 @@ jobs:
         run: |
           ID=$(jq -r .id module.json)
           rm -rf /tmp/build && mkdir -p "/tmp/build/$ID"
-          rsync -a --exclude '.git' --exclude '.github' --exclude 'backups' --exclude '*.zip' --exclude 'RELEASE_NOTES.md' --exclude '.gitignore' --exclude '.gitattributes' ./ "/tmp/build/$ID/"
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'backups' --exclude 'docs' --exclude '*.zip' --exclude 'RELEASE_NOTES.md' --exclude '.gitignore' --exclude '.gitattributes' ./ "/tmp/build/$ID/"
           (cd /tmp/build && zip -r "$GITHUB_WORKSPACE/module.zip" "$ID")
           unzip -l module.zip
 
